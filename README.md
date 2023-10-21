@@ -3,15 +3,7 @@
 - Atención: No me hago cargo ni responsable del uso que se le puede dar a este repositorio!
 - Recuerda: Está hecho para fines educativos y de aprendizaje.
 
-En desarollo
-...
-# Información:
-
-    Por el momento solo tenemos disponible la funcion "shell" que nos introduce en una consola interactiva para ejecutar
-    comandos en la víctima.
-    
-        Entramos con el comando -> "shell"
-        Salimos con el comando  -> "exit
+En desarollo...
 
 
 # Test Linux
@@ -30,7 +22,7 @@ En desarollo
     - Cliente:
         `gcc linux/client.c -o linux/client`
     - Server:
-      `gcc linux/client.c -o linux/client`
+        `gcc linux/client.c -o linux/client`
 
 
 3. Ejecutamos:
@@ -51,10 +43,10 @@ En desarollo
 2. Compilamos:
 
     - Cliente:
-      `gcc .\client.c -o .\dist\client -lws2_32`
+      ` gcc .\client.c -o .\dist\client -lws2_32 -lShlwapi`
 
     - Server:
-      `gcc .\server.c  -o .\dist\server -lws2_32`
+      `gcc .\server.c -o .\dist\server -lws2_32 -lShlwapi`
 
 
 3. Ejecutamos:
@@ -66,7 +58,10 @@ En desarollo
 # Aviable Commands
 Por el momento tenemos disponible los siguientes comandos:
 
-    - help           -> Show help message
-    - shell          -> Enter shell mode ("q" for exit)
-    - q / exit       -> Exit server
-    - q -y / exit -y -> Exit server and client (close binary) 
+    - help            -> Show help message
+    - shell           -> Enter shell mode ("q" for exit)
+    - exec            -> Execute command without shell mode
+    - download <file> -> Download file from target
+    - upload <file>   -> Upload local file to target
+    - q / exit        -> Exit server
+    - q -y / exit -y  -> Exit server and client (close binary) 
