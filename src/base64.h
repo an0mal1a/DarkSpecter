@@ -1,5 +1,5 @@
-#ifndef BASE46_H
-#define BASE46_H
+#ifndef BASE64_H
+#define BASE64_H
 
 #include <stdlib.h>
 #include <memory.h>

