@@ -7,7 +7,7 @@ En desarollo...
 
 # Requirements:
   - Compilador GCC (preferiblemente de 64Bits) [DOWNLOAD LINK](https://github.com/brechtsanders/winlibs_mingw/releases/download/13.2.0mcf-16.0.6-11.0.1-ucrt-r2/winlibs-x86_64-mcf-seh-gcc-13.2.0-llvm-16.0.6-mingw-w64ucrt-11.0.1-r2.7z)
-  - Linux: `# apt install buildessential`  
+  - Linux: `# apt install build-essential`  
 
 # Preparation Linux
 
