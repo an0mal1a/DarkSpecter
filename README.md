@@ -7,8 +7,9 @@ En desarollo...
 
 # Requirements:
   - Compilador GCC (preferiblemente de 64Bits) [DOWNLOAD LINK](https://github.com/brechtsanders/winlibs_mingw/releases/download/13.2.0mcf-16.0.6-11.0.1-ucrt-r2/winlibs-x86_64-mcf-seh-gcc-13.2.0-llvm-16.0.6-mingw-w64ucrt-11.0.1-r2.7z)
+  - Linux: `# apt install buildessential`  
 
-# Test Linux
+# Preparation Linux
 
 1. Modifica el archivo **client.c** para especificar la dirección IP y el puerto de destino y si es necesario el del servidor:
    1. Cliente:
@@ -35,7 +36,7 @@ En desarollo...
 
 
 
-# Test Windows
+# Preparation Windows
 
 1. Modificamos el archivo **client.c** especificando la IP de atacante y el puerto especificado en **server.c**
 
@@ -45,7 +46,7 @@ En desarollo...
 2. Compilamos:
 
     - Cliente:
-      ` gcc .\client.c -o .\dist\client -lws2_32 -lShlwapi`
+      ` gcc -mwindows .\client.c -o .\dist\clientwindows -lws2_32 -lShlwapi`
 
     - Server:
       `gcc .\server.c -o .\dist\server -lws2_32 -lShlwapi`
@@ -66,5 +67,6 @@ Por el momento tenemos disponible los siguientes comandos:
     - exec            -> Execute command without shell mode
     - download <file> -> Download file from target
     - sysinfo         -> Show system info (better on linux)
+    - lowpersistence  -> Set persistence (no root)
     - q / exit        -> Exit server
     - q -y / exit -y  -> Exit server and client (close binary) 

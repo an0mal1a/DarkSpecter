@@ -73,7 +73,7 @@ char* strSysrch(){
 
    MEMORYSTATUSEX statex = MemSrch();
    //printf("\t| Total physical memory:\ts %llu GB\n", ((statex.ullTotalPhys / 1024) / 1024) / 1024);
-   sprintf(infoSys + strlen(infoSys), "\t| Total physical memory:\t %llu GB\n", ((statex.ullTotalPhys / 1024) / 1024) / 1024);
+   sprintf(infoSys + strlen(infoSys), "\t| Total RAM memory:\t %llu GB\n", ((statex.ullTotalPhys / 1024) / 1024) / 1024);
 
    SYSTEM_INFO siSysInfo = SysSrch();
    //printf("\t| Processor type:\t %u\n", siSysInfo.dwProcessorType); 
