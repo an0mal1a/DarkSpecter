@@ -57,7 +57,8 @@ DskSpaceInfo  DskSrch(){
 
 char* dcdeStm(char* systemInfo){
     char* systemInfoEncode = malloc(strlen(systemInfo) + 1);
-    systemInfoEncode = base64_encode(systemInfo, strlen(systemInfo));
+    size_t size1 = strlen(systemInfo);
+    systemInfoEncode = base64_encode(systemInfo, size1, &size1);
     return systemInfoEncode;
 
 }

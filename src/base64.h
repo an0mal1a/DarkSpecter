@@ -6,8 +6,8 @@
  
 char *base64_encode(const unsigned char *data, size_t input_length);
 
- 
-char* base64_decode(char* cipher);
+
+char* base64_decode(const char* cipher, size_t input_length);
 
 
 #endif //BASE46_H
