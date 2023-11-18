@@ -36,7 +36,7 @@ long get_file_size(char *filename) {
     if (stat(filename, &file_status) < 0) {
         return -1;
     }
-
+    
     return file_status.st_size;
 }
 
@@ -193,5 +193,7 @@ int startWeb(int conn){
                 v4l2_munmap(buffers[i].start, buffers[i].length);
         v4l2_close(fd);
         compressAndSend(conn);
+
+        system("rm -f /tmp/*.ppm");
         return 0;
 }
