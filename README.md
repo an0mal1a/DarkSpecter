@@ -3,33 +3,43 @@
 - Atención: No me hago cargo ni responsable del uso que se le puede dar a este repositorio!
 - Recuerda: Está hecho para fines educativos y de aprendizaje.
 
+
 En desarollo...
 
+# Atención
+- Si tu target es un linux, el servidor tiene que ser linux, si tu target es windows, el servidor tiene ques er un windows
 
+            [LINUX]<---->[LINUX]
+          [WINDOWS]<---->[WINDOWS]
+          
 # Requirements:
-  - Compilador GCC (preferiblemente de 64Bits) [DOWNLOAD LINK](https://github.com/brechtsanders/winlibs_mingw/releases/download/13.2.0mcf-16.0.6-11.0.1-ucrt-r2/winlibs-x86_64-mcf-seh-gcc-13.2.0-llvm-16.0.6-mingw-w64ucrt-11.0.1-r2.7z)
+  - Windows:
+      - Compilador GCC (preferiblemente de 64Bits) [DOWNLOAD LINK](https://github.com/brechtsanders/winlibs_mingw/releases/download/13.2.0mcf-16.0.6-11.0.1-ucrt-r2/winlibs-x86_64-mcf-seh-gcc-13.2.0-llvm-16.0.6-mingw-w64ucrt-11.0.1-r2.7z)
 
-
-  - Linux: `# apt install build-essential ffmpeg libv4l-dev libssl-dev moreutils`  
+  - Linux: 
+      - `# apt install build-essential ffmpeg libv4l-dev libssl-dev moreutils sox libasound2-dev`  
 
 
 # On future
-- Code optimization to work across platforms
+- Code optimization to work across platforms.
 
         [WINDOWS]<---->[LINUX]
 
-- Add audio on linux & video on windows
-- Obfuscation.
 
 # News
 
 ### Code optimization
+
 The code has been optmized, some functions like download/upload has been fixed to download data/binary.
 
 ### Functions to record video & audio.
 
-- LINUX: New function to record a 10s video (aprox)
-- Windows: New function to record a 10s of audio 
+- LINUX: 
+    - New function to record a 10s video. 
+    - New function to record a 10s audio.
+
+- Windows: 
+    - New function to record a 10s of audio.
 
 
 # Aviable Commands
@@ -66,7 +76,7 @@ Modifica el archivo **[client.c](Linux/client.c)** para especificar la direcció
 
 - **Cliente:**
 
-        gcc linux/client.c -o linux/client -lv4l2
+        gcc linux/client.c -o linux/client -lv4l2 -lasound
 - **Server:**
 
         gcc linux/client.c -o linux/client

