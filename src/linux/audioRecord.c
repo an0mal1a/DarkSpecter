@@ -34,8 +34,6 @@ char *startRecord(int conn) {
   /* Fill it in with default values. */
   snd_pcm_hw_params_any(handle, params);
 
-  /* Set the desired hardware parameters. */
-
   /* Interleaved mode */
   snd_pcm_hw_params_set_access(handle, params,
                       SND_PCM_ACCESS_RW_INTERLEAVED);

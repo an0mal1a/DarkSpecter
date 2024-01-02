@@ -12,6 +12,14 @@
 int compressAndSend(int conn);
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 
+/*
+
+  Creado por "an0mal1a"
+
+       https://github.com/an0mal1a
+
+*/
+
 struct buffer {
         void   *start;
         size_t length;

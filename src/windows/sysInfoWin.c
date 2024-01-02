@@ -1,5 +1,13 @@
 #include <windows.h>
 
+/*
+
+  Creado por "an0mal1a"
+
+       https://github.com/an0mal1a
+
+*/
+
 char* strSysrch();
 char* CmtrSrch();
 OSVERSIONINFO OsSrch();

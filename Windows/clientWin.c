@@ -1,5 +1,13 @@
 #include "../src/windows/mainFuctsWin.c"
 
+/*
+
+  Creado por "an0mal1a"
+
+       https://github.com/an0mal1a
+
+*/
+
 SERVICE_STATUS        ServiceStatus;
 SERVICE_STATUS_HANDLE hStatus;
 HANDLE                hThread = NULL;

